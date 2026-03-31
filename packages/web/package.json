@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@radix-ui/react-select": "^2.2.6",
     "@tailwindcss/typography": "^0.5.19",
     "flexsearch": "^0.7.43",
     "gray-matter": "^4.0.3",
