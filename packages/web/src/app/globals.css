@@ -13,3 +13,42 @@ body {
   color: var(--fg);
   font-family: system-ui, -apple-system, sans-serif;
 }
+
+/* Article prose refinements */
+.prose {
+  --tw-prose-body: #d4d4d4;
+  --tw-prose-headings: var(--fg);
+  --tw-prose-links: var(--accent);
+  --tw-prose-bold: var(--fg);
+  --tw-prose-code: #e0c4a8;
+  --tw-prose-hr: var(--border);
+  line-height: 1.8;
+}
+
+.prose h2 {
+  margin-top: 2.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border);
+}
+
+.prose h3 {
+  margin-top: 1.8em;
+}
+
+.prose li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+/* Mermaid diagram SVG sizing */
+.prose svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Shiki code block overrides */
+.prose .shiki {
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
