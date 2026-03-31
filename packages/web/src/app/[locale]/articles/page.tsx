@@ -1,10 +1,11 @@
-import { getTranslations } from "next-intl/server";
+import { getTranslations, getLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getArticleList } from "@/lib/articles";
 
 export default async function ArticlesPage() {
   const t = await getTranslations("articles");
-  const articles = await getArticleList();
+  const locale = await getLocale();
+  const articles = await getArticleList(locale);
 
   return (
     <div className="space-y-6">

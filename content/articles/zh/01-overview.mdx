@@ -1,0 +1,45 @@
+---
+title: "架构概览"
+description: "从 CLI 入口到工具执行 —— 全面了解 Claude Code 的整体架构。"
+order: 1
+---
+
+## 什么是 Claude Code？
+
+Claude Code 是 Anthropic 官方的 CLI 工具，用于在终端中直接与 Claude 交互。它可以编辑文件、运行命令、管理 git 工作流 —— 包含约 1,900 个 TypeScript 文件和 512,000+ 行代码。
+
+## 入口
+
+一切从 `main.tsx` 开始，它使用 Commander.js 解析 CLI 参数，并使用 React/Ink 渲染终端 UI。启动时会并行执行多个预取操作：
+
+- MDM 配置读取
+- 钥匙串预取
+- GrowthBook（功能标志）初始化
+
+## 核心循环
+
+系统的核心是 `QueryEngine.ts`（约 46K 行）。它负责：
+
+1. 向 Anthropic API 发送消息
+2. 流式接收响应
+3. 在循环中执行工具调用
+4. 管理 token 计数和成本追踪
+
+## 工具系统
+
+Claude Code 的每项能力 —— 读取文件、运行 shell 命令、搜索代码 —— 都实现为 `src/tools/` 中的一个 **Tool**。每个工具定义了：
+
+- 输入 schema（接受哪些参数）
+- 权限模型（需要用户批准什么）
+- 执行逻辑
+
+访问[代码浏览器](/code/tools)探索全部约 40 个工具实现。
+
+## 接下来
+
+在后续文章中，我们将深入各个模块：
+
+- 工具系统及权限机制
+- 命令系统与斜杠命令
+- Bridge 系统与 IDE 集成
+- Agent/Coordinator 多智能体工作流
