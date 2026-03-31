@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 
 interface SearchResult {
   path: string;
@@ -10,6 +11,7 @@ interface SearchResult {
 }
 
 export function SearchBar() {
+  const t = useTranslations("code");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [index, setIndex] = useState<{ path: string; lines: { num: number; text: string }[] }[]>([]);
@@ -48,7 +50,7 @@ export function SearchBar() {
     <div className="relative">
       <input
         type="text"
-        placeholder="Search source code..."
+        placeholder={t("searchPlaceholder")}
         value={query}
         onChange={(e) => search(e.target.value)}
         className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm focus:border-[var(--accent)] focus:outline-none"

@@ -1,0 +1,32 @@
+{
+  "nav": {
+    "articles": "Articles",
+    "code": "Code",
+    "modules": "Modules"
+  },
+  "home": {
+    "title": "claude-harness",
+    "description": "Deconstructing Anthropic's Claude Code CLI — interactive source code analysis, architecture walkthroughs, and guided deep dives into ~1,900 files and 512,000+ lines of TypeScript.",
+    "articles": "Articles",
+    "articlesDesc": "Guided walkthroughs by module and topic",
+    "codeBrowser": "Code Browser",
+    "codeBrowserDesc": "Browse the full source with syntax highlighting",
+    "moduleIndex": "Module Index",
+    "moduleIndexDesc": "Statistics and overview of every module"
+  },
+  "articles": {
+    "title": "Articles",
+    "description": "Guided walkthroughs of Claude Code's architecture and internals."
+  },
+  "modules": {
+    "title": "Module Index",
+    "description": "Claude Code source is organized into {count} top-level modules, sorted by line count.",
+    "files": "{count} files",
+    "lines": "{count} lines"
+  },
+  "code": {
+    "selectFile": "Select a file from the tree to view its source code.",
+    "fileNotFound": "File not found: {path}",
+    "searchPlaceholder": "Search source code..."
+  }
+}

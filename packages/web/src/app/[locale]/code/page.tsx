@@ -1,8 +1,11 @@
+import { useTranslations } from "next-intl";
 import { FileTree } from "@/components/FileTree";
 import { SearchBar } from "@/components/SearchBar";
-import fileTree from "../../../generated/file-tree.json";
+import fileTree from "../../../../generated/file-tree.json";
 
 export default function CodeIndex() {
+  const t = useTranslations("code");
+
   return (
     <div>
       <div className="mb-4">
@@ -13,7 +16,7 @@ export default function CodeIndex() {
           <FileTree tree={fileTree} />
         </div>
         <div className="flex-1 flex items-center justify-center text-neutral-500">
-          Select a file from the tree to view its source code.
+          {t("selectFile")}
         </div>
       </div>
     </div>

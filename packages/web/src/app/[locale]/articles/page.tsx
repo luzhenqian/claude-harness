@@ -1,13 +1,15 @@
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { getArticleList } from "@/lib/articles";
 
 export default async function ArticlesPage() {
+  const t = useTranslations("articles");
   const articles = await getArticleList();
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Articles</h1>
-      <p className="text-neutral-400">Guided walkthroughs of Claude Code&apos;s architecture and internals.</p>
+      <h1 className="text-3xl font-bold">{t("title")}</h1>
+      <p className="text-neutral-400">{t("description")}</p>
       <div className="space-y-4">
         {articles.map((article) => (
           <Link

@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 
 interface ModuleCardProps {
   name: string;
@@ -9,6 +10,8 @@ interface ModuleCardProps {
 }
 
 export function ModuleCard({ name, path, fileCount, lineCount, description }: ModuleCardProps) {
+  const t = useTranslations("modules");
+
   return (
     <Link
       href={`/code/${path}`}
@@ -17,8 +20,8 @@ export function ModuleCard({ name, path, fileCount, lineCount, description }: Mo
       <h3 className="font-mono font-semibold text-[var(--accent)]">{name}/</h3>
       {description && <p className="mt-1 text-sm text-neutral-400">{description}</p>}
       <div className="mt-3 flex gap-4 text-xs text-neutral-500">
-        <span>{fileCount} files</span>
-        <span>{lineCount.toLocaleString()} lines</span>
+        <span>{t("files", { count: fileCount })}</span>
+        <span>{t("lines", { count: lineCount.toLocaleString() })}</span>
       </div>
     </Link>
   );

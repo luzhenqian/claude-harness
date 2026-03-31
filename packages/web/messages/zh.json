@@ -1,0 +1,32 @@
+{
+  "nav": {
+    "articles": "文章",
+    "code": "代码",
+    "modules": "模块"
+  },
+  "home": {
+    "title": "claude-harness",
+    "description": "拆解 Anthropic 的 Claude Code CLI — 交互式源码分析、架构解读，深入探索约 1,900 个文件、512,000+ 行 TypeScript 代码。",
+    "articles": "文章",
+    "articlesDesc": "按模块和主题的源码导读",
+    "codeBrowser": "代码浏览器",
+    "codeBrowserDesc": "带语法高亮的源码浏览",
+    "moduleIndex": "模块索引",
+    "moduleIndexDesc": "每个模块的统计数据与概览"
+  },
+  "articles": {
+    "title": "文章",
+    "description": "Claude Code 架构与内部实现的源码导读。"
+  },
+  "modules": {
+    "title": "模块索引",
+    "description": "Claude Code 源码包含 {count} 个顶层模块，按代码行数排序。",
+    "files": "{count} 个文件",
+    "lines": "{count} 行"
+  },
+  "code": {
+    "selectFile": "从左侧文件树中选择文件查看源码。",
+    "fileNotFound": "文件未找到：{path}",
+    "searchPlaceholder": "搜索源代码..."
+  }
+}

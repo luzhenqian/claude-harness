@@ -1,14 +1,16 @@
+import { getTranslations } from "next-intl/server";
 import { readSourceFile } from "@/lib/source";
 import { FileTree } from "@/components/FileTree";
 import { CodeViewer } from "@/components/CodeViewer";
 import { SearchBar } from "@/components/SearchBar";
-import fileTree from "../../../../generated/file-tree.json";
+import fileTree from "../../../../../generated/file-tree.json";
 
 interface Props {
   params: Promise<{ path: string[] }>;
 }
 
 export default async function CodePage({ params }: Props) {
+  const t = await getTranslations("code");
   const { path } = await params;
   const filePath = path.join("/");
   let code: string | null = null;
@@ -17,7 +19,7 @@ export default async function CodePage({ params }: Props) {
   try {
     code = await readSourceFile(filePath);
   } catch {
-    error = `File not found: ${filePath}`;
+    error = t("fileNotFound", { path: filePath });
   }
 
   return (

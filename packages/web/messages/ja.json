@@ -1,0 +1,32 @@
+{
+  "nav": {
+    "articles": "記事",
+    "code": "コード",
+    "modules": "モジュール"
+  },
+  "home": {
+    "title": "claude-harness",
+    "description": "Anthropic の Claude Code CLI を解体 — インタラクティブなソースコード分析、アーキテクチャの解説、約1,900ファイル・512,000行以上の TypeScript コードを深掘り。",
+    "articles": "記事",
+    "articlesDesc": "モジュールとトピック別のガイド",
+    "codeBrowser": "コードブラウザ",
+    "codeBrowserDesc": "シンタックスハイライト付きでソースを閲覧",
+    "moduleIndex": "モジュール一覧",
+    "moduleIndexDesc": "全モジュールの統計情報と概要"
+  },
+  "articles": {
+    "title": "記事",
+    "description": "Claude Code のアーキテクチャと内部実装のガイド。"
+  },
+  "modules": {
+    "title": "モジュール一覧",
+    "description": "Claude Code のソースは {count} 個のトップレベルモジュールで構成されています（行数順）。",
+    "files": "{count} ファイル",
+    "lines": "{count} 行"
+  },
+  "code": {
+    "selectFile": "ファイルツリーからファイルを選択してソースコードを表示します。",
+    "fileNotFound": "ファイルが見つかりません：{path}",
+    "searchPlaceholder": "ソースコードを検索..."
+  }
+}
