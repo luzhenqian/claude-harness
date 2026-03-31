@@ -1,9 +1,9 @@
-import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getArticleList } from "@/lib/articles";
 
 export default async function ArticlesPage() {
-  const t = useTranslations("articles");
+  const t = await getTranslations("articles");
   const articles = await getArticleList();
 
   return (
