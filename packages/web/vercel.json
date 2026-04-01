@@ -2,3 +2,4 @@
   "framework": "nextjs",
   "buildCommand": "next build"
 }
+
