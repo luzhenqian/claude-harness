@@ -1,7 +1,7 @@
 // packages/scripts/src/download-source.ts
 import { existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
 const SOURCE_DIR = resolve(ROOT, "packages/claude-code-source/src");
@@ -33,14 +33,14 @@ async function main() {
 
   // Download using curl (available on all Vercel/CI environments)
   const curlArgs = [
-    "curl", "-fSL",
+    "-fSL",
     "-o", tarball,
-    ...(token ? ["-H", `"Authorization: token ${token}"`] : []),
-    "-H", `"Accept: application/octet-stream"`,
+    ...(token ? ["-H", `Authorization: Bearer ${token}`] : []),
+    "-H", "Accept: application/octet-stream",
     url,
   ];
 
-  execSync(curlArgs.join(" "), { stdio: "inherit" });
+  execFileSync("curl", curlArgs, { stdio: "inherit" });
 
   console.log("Extracting archive...");
   mkdirSync(SOURCE_DIR, { recursive: true });
