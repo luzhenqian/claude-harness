@@ -8,9 +8,13 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@claude-harness/source"],
   // Include monorepo content directory in serverless function file tracing
   outputFileTracingRoot: resolve(__dirname, "../../"),
-  // Include content files in serverless bundle
+  // Include content files and shiki WASM in serverless bundle
   outputFileTracingIncludes: {
-    "/[locale]/articles/[slug]": ["../../content/articles/**/*.mdx"],
+    "/[locale]/articles/[slug]": [
+      "../../content/articles/**/*.mdx",
+      "./node_modules/shiki/**",
+      "./node_modules/@shikijs/**",
+    ],
     "/[locale]/articles": ["../../content/articles/**/*.mdx"],
   },
 };
