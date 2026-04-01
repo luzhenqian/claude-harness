@@ -240,7 +240,7 @@ function CustomGraphDiagram({ chart }: { chart: string }) {
   return <FlowDiagram nodes={nodes} edges={edges} isHorizontal={isHorizontal} />;
 }
 
-// ─── Comparison Diagram (side-by-side subgraphs) ──────────────────
+// ─── Comparison Diagram (side-by-side timeline) ───────────────────
 
 function ComparisonDiagram({
   subgraphs,
@@ -251,165 +251,113 @@ function ComparisonDiagram({
   nodes: Map<string, ParsedNode>;
   edges: ParsedEdge[];
 }) {
+  // Analyze each subgraph's structure
+  const panels = subgraphs.map((sg) => {
+    const sgNodeSet = new Set(sg.nodeIds);
+    const sgEdges = edges.filter(
+      (e) => sgNodeSet.has(e.from) && sgNodeSet.has(e.to)
+    );
+
+    const outDegree = new Map<string, number>();
+    const inDegree = new Map<string, number>();
+    for (const id of sg.nodeIds) {
+      outDegree.set(id, 0);
+      inDegree.set(id, 0);
+    }
+    for (const e of sgEdges) {
+      outDegree.set(e.from, (outDegree.get(e.from) || 0) + 1);
+      inDegree.set(e.to, (inDegree.get(e.to) || 0) + 1);
+    }
+
+    const startNodes = sg.nodeIds.filter((id) => inDegree.get(id) === 0);
+    const endNodes = sg.nodeIds.filter((id) => outDegree.get(id) === 0);
+    const hasFork = startNodes.some((id) => (outDegree.get(id) || 0) > 1);
+    const isSlow = /慢|串行|slow/i.test(sg.label);
+
+    // Build ordered timeline rows
+    // For fork-join: start → [parallel group] → end
+    // For linear: step → step → step
+    type Row = { ids: string[]; parallel: boolean };
+    const rows: Row[] = [];
+
+    if (hasFork && startNodes.length === 1 && endNodes.length === 1) {
+      const middleIds = sg.nodeIds.filter(
+        (id) => id !== startNodes[0] && id !== endNodes[0]
+      );
+      rows.push({ ids: [startNodes[0]], parallel: false });
+      rows.push({ ids: middleIds, parallel: true });
+      rows.push({ ids: [endNodes[0]], parallel: false });
+    } else {
+      const ordered = topoSortSubset(sg.nodeIds, sgEdges);
+      for (const id of ordered) {
+        rows.push({ ids: [id], parallel: false });
+      }
+    }
+
+    return { sg, rows, isSlow };
+  });
+
+  // Calculate timeline: each step = 1 unit, parallel steps share the same time slot
+  const maxSlots = Math.max(
+    ...panels.map((p) => p.rows.length)
+  );
+
   return (
     <div className="diagram-comparison">
-      {subgraphs.map((sg, sgIdx) => {
-        const pal = getPalette(sgIdx);
-        const sgNodeSet = new Set(sg.nodeIds);
-        const sgEdges = edges.filter(
-          (e) => sgNodeSet.has(e.from) && sgNodeSet.has(e.to)
-        );
-
-        // Determine structure: is it a linear chain or a fork-join?
-        const inDegree = new Map<string, number>();
-        const outDegree = new Map<string, number>();
-        for (const id of sg.nodeIds) {
-          inDegree.set(id, 0);
-          outDegree.set(id, 0);
-        }
-        for (const e of sgEdges) {
-          outDegree.set(e.from, (outDegree.get(e.from) || 0) + 1);
-          inDegree.set(e.to, (inDegree.get(e.to) || 0) + 1);
-        }
-
-        // Find start nodes (in-degree 0) and end nodes (out-degree 0)
-        const startNodes = sg.nodeIds.filter((id) => inDegree.get(id) === 0);
-        const endNodes = sg.nodeIds.filter((id) => outDegree.get(id) === 0);
-        const middleNodes = sg.nodeIds.filter(
-          (id) => inDegree.get(id)! > 0 && outDegree.get(id)! > 0
-        );
-
-        // Detect fork-join: one start fans out to multiple, which converge to one end
-        const isForkJoin =
-          startNodes.length === 1 &&
-          endNodes.length === 1 &&
-          middleNodes.length > 1 &&
-          (outDegree.get(startNodes[0]) || 0) > 1;
-
-        // Check if label implies "slow"
-        const isSlow = /慢|串行|slow/i.test(sg.label);
+      {panels.map((panel, pIdx) => {
+        const color = panel.isSlow ? "#f87171" : "#34d399";
+        const barBg = panel.isSlow
+          ? "rgba(248,113,113,0.2)"
+          : "rgba(52,211,153,0.2)";
+        const barFill = panel.isSlow
+          ? "rgba(248,113,113,0.5)"
+          : "rgba(52,211,153,0.5)";
 
         return (
-          <div
-            key={sgIdx}
-            className="diagram-compare-box"
-            style={{ borderColor: pal.border + "40" }}
-          >
-            <div
-              className="diagram-compare-title"
-              style={{ color: isSlow ? "#f87171" : pal.text }}
-            >
-              {isSlow ? "✕ " : "✓ "}
-              {sg.label}
+          <div key={pIdx} className="cmp-panel">
+            <div className="cmp-title" style={{ color }}>
+              {panel.sg.label}
             </div>
-            <div className="diagram-compare-flow">
-              {isForkJoin ? (
-                <ForkJoinFlow
-                  startId={startNodes[0]}
-                  endId={endNodes[0]}
-                  middleIds={middleNodes}
-                  nodes={nodes}
-                  pal={pal}
-                />
-              ) : (
-                <LinearFlow
-                  nodeIds={sg.nodeIds}
-                  edges={sgEdges}
-                  nodes={nodes}
-                  pal={pal}
-                  isSequential={isSlow}
-                />
-              )}
+            <div className="cmp-timeline">
+              {panel.rows.map((row, rIdx) => (
+                <div key={rIdx} className="cmp-row">
+                  <div className="cmp-labels">
+                    {row.ids.map((id) => {
+                      const node = nodes.get(id);
+                      return (
+                        <span key={id} className="cmp-label">
+                          {node?.title || id}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className="cmp-bar-track" style={{ background: barBg }}>
+                    <div
+                      className="cmp-bar"
+                      style={{
+                        background: barFill,
+                        width: `${(1 / maxSlots) * 100}%`,
+                        marginLeft: panel.isSlow
+                          ? `${(rIdx / maxSlots) * 100}%`
+                          : row.parallel
+                            ? `${(1 / maxSlots) * 100}%`
+                            : rIdx === 0
+                              ? "0%"
+                              : `${(2 / maxSlots) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="cmp-total" style={{ color }}>
+              {panel.isSlow
+                ? `总耗时 ≈ ${panel.rows.length} 步`
+                : `总耗时 ≈ ${panel.rows.length} 步（并行 = 更快）`}
             </div>
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function LinearFlow({
-  nodeIds,
-  edges,
-  nodes,
-  pal,
-  isSequential,
-}: {
-  nodeIds: string[];
-  edges: ParsedEdge[];
-  nodes: Map<string, ParsedNode>;
-  pal: (typeof PALETTE)[0];
-  isSequential: boolean;
-}) {
-  const ordered = topoSortSubset(nodeIds, edges);
-  return (
-    <>
-      {ordered.map((id, i) => {
-        const node = nodes.get(id);
-        if (!node) return null;
-        return (
-          <React.Fragment key={id}>
-            {i > 0 && <DownArrow muted={isSequential} />}
-            <NodeBox node={node} pal={pal} compact />
-          </React.Fragment>
-        );
-      })}
-    </>
-  );
-}
-
-function ForkJoinFlow({
-  startId,
-  endId,
-  middleIds,
-  nodes,
-  pal,
-}: {
-  startId: string;
-  endId: string;
-  middleIds: string[];
-  nodes: Map<string, ParsedNode>;
-  pal: (typeof PALETTE)[0];
-}) {
-  const startNode = nodes.get(startId);
-  const endNode = nodes.get(endId);
-
-  return (
-    <>
-      {startNode && <NodeBox node={startNode} pal={pal} compact />}
-      <div className="diagram-fork-indicator">
-        <svg width="60" height="20" viewBox="0 0 60 20">
-          <line x1="30" y1="0" x2="10" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
-          <line x1="30" y1="0" x2="30" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
-          <line x1="30" y1="0" x2="50" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
-        </svg>
-      </div>
-      <div className="diagram-parallel-group">
-        {middleIds.map((id) => {
-          const node = nodes.get(id);
-          if (!node) return null;
-          return <NodeBox key={id} node={node} pal={pal} compact />;
-        })}
-      </div>
-      <div className="diagram-fork-indicator">
-        <svg width="60" height="20" viewBox="0 0 60 20">
-          <line x1="10" y1="0" x2="30" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
-          <line x1="30" y1="0" x2="30" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
-          <line x1="50" y1="0" x2="30" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
-        </svg>
-      </div>
-      {endNode && <NodeBox node={endNode} pal={pal} compact />}
-    </>
-  );
-}
-
-function DownArrow({ muted }: { muted?: boolean }) {
-  return (
-    <div className="diagram-arrow">
-      <svg width="14" height="20" viewBox="0 0 14 20">
-        <line x1="7" y1="2" x2="7" y2="14" stroke={muted ? "#475569" : "#64748b"} strokeWidth="1.5" />
-        <polygon points="3,13 7,19 11,13" fill={muted ? "#475569" : "#64748b"} />
-      </svg>
     </div>
   );
 }
