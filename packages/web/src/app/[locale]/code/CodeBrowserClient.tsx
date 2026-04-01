@@ -75,7 +75,7 @@ function FileNode({
   highlightPath?: string;
 }) {
   const [isOpen, setIsOpen] = useState(
-    level < 1 || (expandedPaths?.has(node.path) ?? false)
+    expandedPaths?.has(node.path) ?? false
   );
   const isSelected = selectedPath === node.path && node.type === "file";
   const isHighlighted = highlightPath === node.path;
