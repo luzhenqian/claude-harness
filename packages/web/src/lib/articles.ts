@@ -6,19 +6,22 @@ import { existsSync } from "node:fs";
 
 function findArticlesBase(): string {
   const cwd = process.cwd();
+  // __dirname points to the compiled output location
+  const dir = typeof __dirname !== "undefined" ? __dirname : cwd;
   const candidates = [
-    resolve(cwd, "../../content/articles"),
+    // Vercel: cwd=/vercel/path0, content at /vercel/path0/content/articles
     resolve(cwd, "content/articles"),
+    // Local dev from packages/web
+    resolve(cwd, "../../content/articles"),
+    // __dirname based (compiled js is deep in .next/server/...)
+    resolve(dir, "../../../../../content/articles"),
+    resolve(dir, "../../../../../../content/articles"),
     resolve(cwd, "../content/articles"),
   ];
-  console.log(`[articles] cwd=${cwd}, checking: ${candidates.join(", ")}`);
   for (const c of candidates) {
-    if (existsSync(c)) {
-      console.log(`[articles] Found: ${c}`);
-      return c;
-    }
+    if (existsSync(c)) return c;
   }
-  console.error(`[articles] NOT FOUND, using fallback: ${candidates[0]}`);
+  console.error(`[articles] NOT FOUND! cwd=${cwd} dir=${dir}`);
   return candidates[0];
 }
 
