@@ -1160,7 +1160,106 @@ footer a:hover { color: var(--accent); }
   border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--bg-elevated);
-  overflow-x: auto;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Diagram Viewport (zoom / pan) ── */
+.diagram-viewport {
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  min-height: 120px;
+}
+.diagram-viewport:active {
+  cursor: grabbing;
+}
+.diagram-viewport-content {
+  transform-origin: 0 0;
+}
+
+/* ── Diagram Controls ── */
+.diagram-controls {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  z-index: 10;
+}
+.diagram-viewport:hover .diagram-controls,
+.diagram-controls:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.diagram-controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.diagram-controls button:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  color: var(--text-bright);
+  border-color: var(--border-hover);
+}
+.diagram-controls button:active:not(:disabled) {
+  background: var(--border);
+}
+.diagram-controls button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.diagram-controls-row {
+  display: flex;
+  gap: 2px;
+}
+.diagram-controls-zoom {
+  display: flex;
+  gap: 2px;
+}
+.diagram-controls-divider {
+  width: 24px;
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* ── Fullscreen diagram ── */
+.diagram-block:fullscreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 48px;
+  border: none;
+  border-radius: 0;
+}
+.diagram-block:fullscreen .diagram-viewport {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.diagram-block:fullscreen .diagram-controls {
+  opacity: 1;
+  pointer-events: auto;
+  bottom: 24px;
+  right: 24px;
 }
 
 /* ── Custom Diagram ── */

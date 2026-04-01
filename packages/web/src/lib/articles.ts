@@ -48,13 +48,14 @@ function getArticlesDir(locale: string): string {
 }
 
 export async function getArticleList(locale: string): Promise<ArticleMeta[]> {
-  const dir = getArticlesDir(locale);
+  let dir = getArticlesDir(locale);
   let files: string[];
   try {
     files = await readdir(dir);
   } catch {
     // Fallback to English if locale dir doesn't exist
-    files = await readdir(getArticlesDir("en"));
+    dir = getArticlesDir("en");
+    files = await readdir(dir);
   }
   const articles: ArticleMeta[] = [];
 

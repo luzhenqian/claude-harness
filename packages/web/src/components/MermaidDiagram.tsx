@@ -1,7 +1,18 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import {
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 
 interface MermaidDiagramProps {
   chart: string;
@@ -722,6 +733,167 @@ function NativeMermaid({ chart }: { chart: string }) {
   );
 }
 
+// ─── Diagram Viewport (zoom / pan / controls) ───────────────────
+
+const MIN_SCALE = 0.25;
+const MAX_SCALE = 5;
+const ZOOM_STEP = 0.15;
+const PAN_STEP = 80;
+
+function DiagramViewport({ children }: { children: React.ReactNode }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const dragRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
+
+  const clampScale = (s: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
+
+  // Use refs so stable callbacks always see the latest values
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  const fullscreenRef = useRef(isFullscreen);
+  fullscreenRef.current = isFullscreen;
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    // In fullscreen: plain scroll = zoom. Outside: Ctrl/Cmd + scroll = zoom.
+    const shouldZoom = fullscreenRef.current || e.ctrlKey || e.metaKey;
+    if (shouldZoom) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+      setScale((s) => clampScale(s + delta));
+    } else {
+      // Adjust scroll deltas by zoom level so panning feels consistent
+      setTranslate((t) => ({
+        x: t.x - e.deltaX / scaleRef.current,
+        y: t.y - e.deltaY / scaleRef.current,
+      }));
+    }
+  }, []);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest(".diagram-controls")) return;
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startTx: translate.x,
+      startTy: translate.y,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, [translate]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    // Divide by zoom so dragging moves content 1:1 with the cursor
+    const dx = (e.clientX - dragRef.current.startX) / scaleRef.current;
+    const dy = (e.clientY - dragRef.current.startY) / scaleRef.current;
+    setTranslate({
+      x: dragRef.current.startTx + dx,
+      y: dragRef.current.startTy + dy,
+    });
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    dragRef.current = null;
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = containerRef.current?.closest(".diagram-block") as HTMLElement | null;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isFullscreen]);
+
+  const zoomIn = () => setScale((s) => clampScale(s + ZOOM_STEP));
+  const zoomOut = () => setScale((s) => clampScale(s - ZOOM_STEP));
+  const reset = () => { setScale(1); setTranslate({ x: 0, y: 0 }); };
+  const panUp = () => setTranslate((t) => ({ ...t, y: t.y + PAN_STEP }));
+  const panDown = () => setTranslate((t) => ({ ...t, y: t.y - PAN_STEP }));
+  const panLeft = () => setTranslate((t) => ({ ...t, x: t.x + PAN_STEP }));
+  const panRight = () => setTranslate((t) => ({ ...t, x: t.x - PAN_STEP }));
+
+  const isDefault = scale === 1 && translate.x === 0 && translate.y === 0;
+
+  return (
+    <div
+      ref={containerRef}
+      className="diagram-viewport"
+      onWheel={handleWheel}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
+      <div
+        ref={contentRef}
+        className="diagram-viewport-content"
+        style={{
+          transform: `translate(${translate.x}px, ${translate.y}px)`,
+          zoom: scale,
+        }}
+      >
+        {children}
+      </div>
+
+      <div className="diagram-controls">
+        <button onClick={toggleFullscreen} title={isFullscreen ? "Exit fullscreen" : "Fullscreen"} aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
+          {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+        </button>
+        <div className="diagram-controls-divider" />
+        <button onClick={panUp} title="Pan up" aria-label="Pan up">
+          <ChevronUp size={16} />
+        </button>
+        <div className="diagram-controls-row">
+          <button onClick={panLeft} title="Pan left" aria-label="Pan left">
+            <ChevronLeft size={16} />
+          </button>
+          <button onClick={reset} title="Reset view" aria-label="Reset view" disabled={isDefault}>
+            <RotateCcw size={14} />
+          </button>
+          <button onClick={panRight} title="Pan right" aria-label="Pan right">
+            <ChevronRight size={16} />
+          </button>
+        </div>
+        <button onClick={panDown} title="Pan down" aria-label="Pan down">
+          <ChevronDown size={16} />
+        </button>
+        <div className="diagram-controls-divider" />
+        <div className="diagram-controls-zoom">
+          <button onClick={zoomIn} title="Zoom in" aria-label="Zoom in">
+            <ZoomIn size={16} />
+          </button>
+          <button onClick={zoomOut} title="Zoom out" aria-label="Zoom out">
+            <ZoomOut size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────
 
 export function MermaidDiagram({ chart }: MermaidDiagramProps) {
@@ -729,11 +901,13 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
 
   return (
     <div className="diagram-block">
-      {isNativeMermaidType(trimmed) ? (
-        <NativeMermaid chart={trimmed} />
-      ) : (
-        <CustomGraphDiagram chart={trimmed} />
-      )}
+      <DiagramViewport>
+        {isNativeMermaidType(trimmed) ? (
+          <NativeMermaid chart={trimmed} />
+        ) : (
+          <CustomGraphDiagram chart={trimmed} />
+        )}
+      </DiagramViewport>
     </div>
   );
 }
