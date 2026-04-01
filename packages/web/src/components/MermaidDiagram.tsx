@@ -196,13 +196,37 @@ function parseChart(chart: string): ParsedChart {
 
 // ─── Custom Graph Renderer ────────────────────────────────────────
 
+/** Check if this is a side-by-side comparison (e.g. serial vs parallel) */
+function isComparisonDiagram(
+  subgraphs: ParsedSubgraph[],
+  edges: ParsedEdge[]
+): boolean {
+  if (subgraphs.length !== 2) return false;
+  // No edges between the two subgraphs → independent comparison
+  const setA = new Set(subgraphs[0].nodeIds);
+  const setB = new Set(subgraphs[1].nodeIds);
+  return !edges.some(
+    (e) =>
+      (setA.has(e.from) && setB.has(e.to)) ||
+      (setB.has(e.from) && setA.has(e.to))
+  );
+}
+
 function CustomGraphDiagram({ chart }: { chart: string }) {
   const parsed = parseChart(chart);
   const { direction, nodes, edges, subgraphs } = parsed;
   const isHorizontal = direction === "LR";
 
-  // If subgraphs exist, render layered layout
   if (subgraphs.length > 0) {
+    if (isComparisonDiagram(subgraphs, edges)) {
+      return (
+        <ComparisonDiagram
+          subgraphs={subgraphs}
+          nodes={nodes}
+          edges={edges}
+        />
+      );
+    }
     return (
       <LayeredDiagram
         subgraphs={subgraphs}
@@ -213,8 +237,214 @@ function CustomGraphDiagram({ chart }: { chart: string }) {
     );
   }
 
-  // Simple flow without subgraphs
   return <FlowDiagram nodes={nodes} edges={edges} isHorizontal={isHorizontal} />;
+}
+
+// ─── Comparison Diagram (side-by-side subgraphs) ──────────────────
+
+function ComparisonDiagram({
+  subgraphs,
+  nodes,
+  edges,
+}: {
+  subgraphs: ParsedSubgraph[];
+  nodes: Map<string, ParsedNode>;
+  edges: ParsedEdge[];
+}) {
+  return (
+    <div className="diagram-comparison">
+      {subgraphs.map((sg, sgIdx) => {
+        const pal = getPalette(sgIdx);
+        const sgNodeSet = new Set(sg.nodeIds);
+        const sgEdges = edges.filter(
+          (e) => sgNodeSet.has(e.from) && sgNodeSet.has(e.to)
+        );
+
+        // Determine structure: is it a linear chain or a fork-join?
+        const inDegree = new Map<string, number>();
+        const outDegree = new Map<string, number>();
+        for (const id of sg.nodeIds) {
+          inDegree.set(id, 0);
+          outDegree.set(id, 0);
+        }
+        for (const e of sgEdges) {
+          outDegree.set(e.from, (outDegree.get(e.from) || 0) + 1);
+          inDegree.set(e.to, (inDegree.get(e.to) || 0) + 1);
+        }
+
+        // Find start nodes (in-degree 0) and end nodes (out-degree 0)
+        const startNodes = sg.nodeIds.filter((id) => inDegree.get(id) === 0);
+        const endNodes = sg.nodeIds.filter((id) => outDegree.get(id) === 0);
+        const middleNodes = sg.nodeIds.filter(
+          (id) => inDegree.get(id)! > 0 && outDegree.get(id)! > 0
+        );
+
+        // Detect fork-join: one start fans out to multiple, which converge to one end
+        const isForkJoin =
+          startNodes.length === 1 &&
+          endNodes.length === 1 &&
+          middleNodes.length > 1 &&
+          (outDegree.get(startNodes[0]) || 0) > 1;
+
+        // Check if label implies "slow"
+        const isSlow = /慢|串行|slow/i.test(sg.label);
+
+        return (
+          <div
+            key={sgIdx}
+            className="diagram-compare-box"
+            style={{ borderColor: pal.border + "40" }}
+          >
+            <div
+              className="diagram-compare-title"
+              style={{ color: isSlow ? "#f87171" : pal.text }}
+            >
+              {isSlow ? "✕ " : "✓ "}
+              {sg.label}
+            </div>
+            <div className="diagram-compare-flow">
+              {isForkJoin ? (
+                <ForkJoinFlow
+                  startId={startNodes[0]}
+                  endId={endNodes[0]}
+                  middleIds={middleNodes}
+                  nodes={nodes}
+                  pal={pal}
+                />
+              ) : (
+                <LinearFlow
+                  nodeIds={sg.nodeIds}
+                  edges={sgEdges}
+                  nodes={nodes}
+                  pal={pal}
+                  isSequential={isSlow}
+                />
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function LinearFlow({
+  nodeIds,
+  edges,
+  nodes,
+  pal,
+  isSequential,
+}: {
+  nodeIds: string[];
+  edges: ParsedEdge[];
+  nodes: Map<string, ParsedNode>;
+  pal: (typeof PALETTE)[0];
+  isSequential: boolean;
+}) {
+  const ordered = topoSortSubset(nodeIds, edges);
+  return (
+    <>
+      {ordered.map((id, i) => {
+        const node = nodes.get(id);
+        if (!node) return null;
+        return (
+          <React.Fragment key={id}>
+            {i > 0 && <DownArrow muted={isSequential} />}
+            <NodeBox node={node} pal={pal} compact />
+          </React.Fragment>
+        );
+      })}
+    </>
+  );
+}
+
+function ForkJoinFlow({
+  startId,
+  endId,
+  middleIds,
+  nodes,
+  pal,
+}: {
+  startId: string;
+  endId: string;
+  middleIds: string[];
+  nodes: Map<string, ParsedNode>;
+  pal: (typeof PALETTE)[0];
+}) {
+  const startNode = nodes.get(startId);
+  const endNode = nodes.get(endId);
+
+  return (
+    <>
+      {startNode && <NodeBox node={startNode} pal={pal} compact />}
+      <div className="diagram-fork-indicator">
+        <svg width="60" height="20" viewBox="0 0 60 20">
+          <line x1="30" y1="0" x2="10" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
+          <line x1="30" y1="0" x2="30" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
+          <line x1="30" y1="0" x2="50" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
+        </svg>
+      </div>
+      <div className="diagram-parallel-group">
+        {middleIds.map((id) => {
+          const node = nodes.get(id);
+          if (!node) return null;
+          return <NodeBox key={id} node={node} pal={pal} compact />;
+        })}
+      </div>
+      <div className="diagram-fork-indicator">
+        <svg width="60" height="20" viewBox="0 0 60 20">
+          <line x1="10" y1="0" x2="30" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
+          <line x1="30" y1="0" x2="30" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
+          <line x1="50" y1="0" x2="30" y2="20" stroke={pal.border} strokeWidth="1.5" opacity="0.5" />
+        </svg>
+      </div>
+      {endNode && <NodeBox node={endNode} pal={pal} compact />}
+    </>
+  );
+}
+
+function DownArrow({ muted }: { muted?: boolean }) {
+  return (
+    <div className="diagram-arrow">
+      <svg width="14" height="20" viewBox="0 0 14 20">
+        <line x1="7" y1="2" x2="7" y2="14" stroke={muted ? "#475569" : "#64748b"} strokeWidth="1.5" />
+        <polygon points="3,13 7,19 11,13" fill={muted ? "#475569" : "#64748b"} />
+      </svg>
+    </div>
+  );
+}
+
+function topoSortSubset(nodeIds: string[], edges: ParsedEdge[]): string[] {
+  const ids = [...nodeIds];
+  const inDeg = new Map<string, number>();
+  const adj = new Map<string, string[]>();
+  const idSet = new Set(ids);
+
+  for (const id of ids) {
+    inDeg.set(id, 0);
+    adj.set(id, []);
+  }
+  for (const e of edges) {
+    if (idSet.has(e.from) && idSet.has(e.to)) {
+      adj.get(e.from)!.push(e.to);
+      inDeg.set(e.to, (inDeg.get(e.to) || 0) + 1);
+    }
+  }
+  const queue = ids.filter((id) => inDeg.get(id) === 0);
+  const result: string[] = [];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    result.push(id);
+    for (const next of adj.get(id) || []) {
+      const d = (inDeg.get(next) || 1) - 1;
+      inDeg.set(next, d);
+      if (d === 0) queue.push(next);
+    }
+  }
+  for (const id of ids) {
+    if (!result.includes(id)) result.push(id);
+  }
+  return result;
 }
 
 // ─── Layered Diagram (with subgraphs) ─────────────────────────────
@@ -230,19 +460,14 @@ function LayeredDiagram({
   edges: ParsedEdge[];
   isHorizontal: boolean;
 }) {
-  // Find edges between layers for arrows
-  const layerNodeSets = subgraphs.map(
-    (sg) => new Set(sg.nodeIds)
-  );
+  const layerNodeSets = subgraphs.map((sg) => new Set(sg.nodeIds));
 
-  // Check if there are inter-layer edges (for arrows between layers)
-  const hasInterLayerEdges = (fromLayerIdx: number, toLayerIdx: number) => {
-    return edges.some(
+  const hasInterLayerEdges = (fromIdx: number, toIdx: number) =>
+    edges.some(
       (e) =>
-        layerNodeSets[fromLayerIdx]?.has(e.from) &&
-        layerNodeSets[toLayerIdx]?.has(e.to)
+        layerNodeSets[fromIdx]?.has(e.from) &&
+        layerNodeSets[toIdx]?.has(e.to)
     );
-  };
 
   return (
     <div
@@ -251,7 +476,6 @@ function LayeredDiagram({
         display: "flex",
         flexDirection: isHorizontal ? "row" : "column",
         gap: "8px",
-        alignItems: isHorizontal ? "stretch" : "stretch",
       }}
     >
       {subgraphs.map((sg, layerIdx) => {
@@ -263,42 +487,24 @@ function LayeredDiagram({
         return (
           <React.Fragment key={layerIdx}>
             <div className="diagram-layer">
-              <div
-                className="diagram-layer-label"
-                style={{ color: pal.text }}
-              >
+              <div className="diagram-layer-label" style={{ color: pal.text }}>
                 {sg.label}
               </div>
               <div
                 className="diagram-layer-nodes"
-                style={{
-                  flexDirection: isHorizontal ? "column" : "row",
-                }}
+                style={{ flexDirection: isHorizontal ? "column" : "row" }}
               >
                 {sg.nodeIds.map((nodeId) => {
                   const node = nodes.get(nodeId);
                   if (!node) return null;
                   const nodePal =
-                    node.paletteIdx != null
-                      ? getPalette(node.paletteIdx)
-                      : pal;
-                  return (
-                    <NodeBox
-                      key={nodeId}
-                      node={node}
-                      pal={nodePal}
-                    />
-                  );
+                    node.paletteIdx != null ? getPalette(node.paletteIdx) : pal;
+                  return <NodeBox key={nodeId} node={node} pal={nodePal} />;
                 })}
               </div>
             </div>
             {showArrow && (
-              <div
-                className="diagram-arrow"
-                style={{
-                  flexDirection: isHorizontal ? "row" : "column",
-                }}
-              >
+              <div className="diagram-arrow">
                 <svg
                   width={isHorizontal ? "28" : "16"}
                   height={isHorizontal ? "16" : "28"}
@@ -306,33 +512,13 @@ function LayeredDiagram({
                 >
                   {isHorizontal ? (
                     <>
-                      <line
-                        x1="4"
-                        y1="8"
-                        x2="20"
-                        y2="8"
-                        stroke="#475569"
-                        strokeWidth="1.5"
-                      />
-                      <polygon
-                        points="19,4 27,8 19,12"
-                        fill="#475569"
-                      />
+                      <line x1="4" y1="8" x2="20" y2="8" stroke="#475569" strokeWidth="1.5" />
+                      <polygon points="19,4 27,8 19,12" fill="#475569" />
                     </>
                   ) : (
                     <>
-                      <line
-                        x1="8"
-                        y1="4"
-                        x2="8"
-                        y2="20"
-                        stroke="#475569"
-                        strokeWidth="1.5"
-                      />
-                      <polygon
-                        points="4,19 8,27 12,19"
-                        fill="#475569"
-                      />
+                      <line x1="8" y1="4" x2="8" y2="20" stroke="#475569" strokeWidth="1.5" />
+                      <polygon points="4,19 8,27 12,19" fill="#475569" />
                     </>
                   )}
                 </svg>
@@ -420,15 +606,17 @@ function FlowDiagram({
 function NodeBox({
   node,
   pal,
+  compact,
 }: {
   node: ParsedNode;
   pal: (typeof PALETTE)[0];
+  compact?: boolean;
 }) {
   const isDecision = node.shape === "decision";
 
   return (
     <div
-      className={`diagram-node ${isDecision ? "diagram-node-decision" : ""}`}
+      className={`diagram-node ${isDecision ? "diagram-node-decision" : ""} ${compact ? "diagram-node-compact" : ""}`}
       style={{
         borderColor: pal.border,
         background: pal.bg,

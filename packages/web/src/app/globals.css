@@ -1230,6 +1230,62 @@ footer a:hover { color: var(--accent); }
   font-family: 'JetBrains Mono', monospace;
 }
 
+/* ── Comparison Diagram ── */
+.diagram-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.diagram-compare-box {
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.diagram-compare-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.diagram-compare-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+}
+.diagram-node-compact {
+  padding: 12px 16px !important;
+  text-align: center;
+  width: 100%;
+}
+.diagram-node-compact .diagram-node-title {
+  font-size: 13px;
+}
+.diagram-parallel-group {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.diagram-parallel-group .diagram-node {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.diagram-fork-indicator {
+  display: flex;
+  justify-content: center;
+  padding: 2px 0;
+}
+@media (max-width: 600px) {
+  .diagram-comparison { grid-template-columns: 1fr; }
+}
+
 /* ── Native Mermaid (sequence / state / class) ── */
 .mermaid-native {
   display: flex;
