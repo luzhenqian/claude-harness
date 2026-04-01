@@ -5,3 +5,7 @@ dist
 packages/web/generated
 .env*.local
 .vercel
+
+# Claude Code source (downloaded at build time from private GitHub Release)
+packages/claude-code-source/src/
+packages/web/public/search-index.json
