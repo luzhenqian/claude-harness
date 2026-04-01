@@ -35,7 +35,7 @@ async function main() {
   const curlArgs = [
     "-fSL",
     "-o", tarball,
-    ...(token ? ["-H", `Authorization: Bearer ${token}`] : []),
+    ...(token ? ["-H", `Authorization: token ${token}`] : []),
     "-H", "Accept: application/octet-stream",
     url,
   ];
