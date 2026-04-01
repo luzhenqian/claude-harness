@@ -4,6 +4,10 @@ import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import { Nav, Footer } from "@/components/Nav";
 
+export function generateStaticParams() {
+  return routing.locales.map((locale) => ({ locale }));
+}
+
 interface Props {
   children: React.ReactNode;
   params: Promise<{ locale: string }>;

@@ -11,6 +11,9 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+export const dynamicParams = false; // Only serve statically generated pages
+export const dynamic = "force-static";
+
 export async function generateStaticParams() {
   const slugs = new Set<string>();
   for (const locale of ["en", "zh", "ja"]) {
