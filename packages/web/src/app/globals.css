@@ -1163,6 +1163,74 @@ footer a:hover { color: var(--accent); }
   overflow-x: auto;
 }
 
+/* ── Custom Diagram ── */
+.custom-diagram {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.diagram-layer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.diagram-layer-label {
+  width: 56px;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+  opacity: 0.7;
+}
+.diagram-layer-nodes {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+}
+.diagram-node {
+  flex: 1;
+  min-width: 0;
+  padding: 18px 20px;
+  border-radius: 10px;
+  border: 1px solid;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.diagram-node:hover {
+  box-shadow: 0 0 20px rgba(255,255,255,0.03);
+}
+.diagram-node-decision {
+  border-style: dashed;
+}
+.diagram-node-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+.diagram-node-desc {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.diagram-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 0;
+}
+.diagram-flow-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.diagram-edge-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Native Mermaid (sequence / state / class) ── */
 .mermaid-native {
   display: flex;
   justify-content: center;
@@ -1170,6 +1238,28 @@ footer a:hover { color: var(--accent); }
 .mermaid-native svg {
   max-width: 100%;
   height: auto;
+}
+.mermaid-native foreignObject {
+  overflow: visible !important;
+}
+.mermaid-native .nodeLabel {
+  overflow: visible !important;
+  line-height: 1.5 !important;
+}
+.mermaid-native .actor { rx: 8; ry: 8; }
+.mermaid-native .messageText { font-size: 12.5px !important; }
+.mermaid-native .labelBox { rx: 6; ry: 6; }
+.mermaid-native .loopText tspan { font-size: 11px !important; }
+.mermaid-native .statediagram-state rect { rx: 8 !important; ry: 8 !important; }
+
+/* ── Fallback pre ── */
+.diagram-fallback {
+  margin: 0;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-x: auto;
 }
 
 .callout {
