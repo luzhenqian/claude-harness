@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { generateFileTree } from "./generate-file-tree.js";
 import { generateModuleStats } from "./generate-module-stats.js";
 import { generateSearchIndex } from "./generate-search-index.js";
+import { generateSourceSummary } from "./generate-source-summary.js";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
 const SOURCE_DIR = resolve(ROOT, "packages/claude-code-source/src");
@@ -18,6 +19,10 @@ async function main() {
   console.log("Generating module stats...");
   const stats = await generateModuleStats(SOURCE_DIR);
   await writeFile(resolve(OUTPUT_DIR, "module-stats.json"), JSON.stringify(stats, null, 2));
+
+  console.log("Generating source summary...");
+  const summary = await generateSourceSummary(SOURCE_DIR);
+  await writeFile(resolve(OUTPUT_DIR, "source-summary.json"), JSON.stringify(summary, null, 2));
 
   console.log("Generating search index...");
   const searchIndex = await generateSearchIndex(SOURCE_DIR);

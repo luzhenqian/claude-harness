@@ -9,6 +9,10 @@ export interface ArticleMeta {
   title: string;
   description: string;
   order: number;
+  tags: string[];
+  readTime: number;
+  moduleCount: number;
+  modules: string[];
 }
 
 function getArticlesDir(locale: string): string {
@@ -35,6 +39,10 @@ export async function getArticleList(locale: string): Promise<ArticleMeta[]> {
       title: data.title || file,
       description: data.description || "",
       order: data.order ?? 999,
+      tags: data.tags || [],
+      readTime: data.readTime ?? 10,
+      moduleCount: data.moduleCount ?? 0,
+      modules: data.modules || [],
     });
   }
 
@@ -65,6 +73,10 @@ export async function getArticle(slug: string, locale: string): Promise<{ meta: 
       title: data.title || slug,
       description: data.description || "",
       order: data.order ?? 999,
+      tags: data.tags || [],
+      readTime: data.readTime ?? 10,
+      moduleCount: data.moduleCount ?? 0,
+      modules: data.modules || [],
     },
     content,
   };

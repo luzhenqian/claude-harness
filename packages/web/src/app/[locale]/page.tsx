@@ -1,41 +1,11 @@
-import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { getArticleList } from "@/lib/articles";
+import { getLocale } from "next-intl/server";
+import moduleStats from "../../../generated/module-stats.json";
+import sourceSummary from "../../../generated/source-summary.json";
+import HomeClient from "./HomeClient";
 
-export default function Home() {
-  const t = useTranslations("home");
-
-  return (
-    <div className="space-y-12">
-      <section className="space-y-4 pt-12">
-        <h1 className="text-4xl font-bold">{t("title")}</h1>
-        <p className="max-w-2xl text-lg text-neutral-400">
-          {t("description")}
-        </p>
-      </section>
-
-      <section className="grid gap-6 sm:grid-cols-3">
-        <Link
-          href="/articles"
-          className="rounded-lg border border-[var(--border)] p-6 hover:border-[var(--accent)] transition-colors"
-        >
-          <h2 className="font-semibold mb-2">{t("articles")}</h2>
-          <p className="text-sm text-neutral-400">{t("articlesDesc")}</p>
-        </Link>
-        <Link
-          href="/code"
-          className="rounded-lg border border-[var(--border)] p-6 hover:border-[var(--accent)] transition-colors"
-        >
-          <h2 className="font-semibold mb-2">{t("codeBrowser")}</h2>
-          <p className="text-sm text-neutral-400">{t("codeBrowserDesc")}</p>
-        </Link>
-        <Link
-          href="/modules"
-          className="rounded-lg border border-[var(--border)] p-6 hover:border-[var(--accent)] transition-colors"
-        >
-          <h2 className="font-semibold mb-2">{t("moduleIndex")}</h2>
-          <p className="text-sm text-neutral-400">{t("moduleIndexDesc")}</p>
-        </Link>
-      </section>
-    </div>
-  );
+export default async function Home() {
+  const locale = await getLocale();
+  const articles = await getArticleList(locale);
+  return <HomeClient locale={locale} articles={articles} moduleStats={moduleStats} sourceSummary={sourceSummary} />;
 }

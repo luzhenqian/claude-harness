@@ -1,28 +1,29 @@
-import type { MDXComponents } from "mdx/types";
+type MDXComponents = Record<string, React.ComponentType<Record<string, unknown>>>;
 import { CodeBlock } from "./CodeBlock";
 import { MermaidDiagram } from "../MermaidDiagram";
 
 function Pre({ children, ...props }: React.ComponentProps<"pre">) {
+  const child = children as React.ReactElement<{ className?: string; children?: React.ReactNode }> | null;
   // Check if this is a mermaid code block
   if (
-    children &&
-    typeof children === "object" &&
-    "props" in children &&
-    children.props?.className === "language-mermaid"
+    child &&
+    typeof child === "object" &&
+    "props" in child &&
+    child.props?.className === "language-mermaid"
   ) {
-    const chart = extractText(children.props.children).trim();
+    const chart = extractText(child.props.children).trim();
     return <MermaidDiagram chart={chart} />;
   }
 
   // Otherwise render with syntax highlighting
   if (
-    children &&
-    typeof children === "object" &&
-    "props" in children
+    child &&
+    typeof child === "object" &&
+    "props" in child
   ) {
     return (
-      <CodeBlock className={children.props?.className}>
-        {children.props?.children}
+      <CodeBlock className={child.props?.className}>
+        {child.props?.children}
       </CodeBlock>
     );
   }
@@ -36,7 +37,7 @@ function extractText(node: React.ReactNode): string {
   if (!node) return "";
   if (Array.isArray(node)) return node.map(extractText).join("");
   if (typeof node === "object" && "props" in node) {
-    return extractText((node as React.ReactElement).props.children);
+    return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
   }
   return "";
 }

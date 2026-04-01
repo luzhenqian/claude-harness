@@ -1,32 +1,74 @@
 "use client";
 
-import { useTranslations } from "next-intl";
-import { Link, usePathname } from "@/i18n/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { LocaleSwitcher } from "./LocaleSwitcher";
 
 export function Nav() {
-  const t = useTranslations("nav");
   const pathname = usePathname();
 
+  // Hide nav on article detail pages (e.g. /zh/articles/overview)
+  const segments = pathname.split('/').filter(Boolean);
+  const isArticleDetail = segments.length >= 3 && segments[1] === 'articles';
+  if (isArticleDetail) return null;
+
+  // Extract locale prefix for links
+  const locale = segments[0] || 'en';
+
+  const navItems = [
+    { name: '文章', path: `/${locale}/articles` },
+    { name: '代码', path: `/${locale}/code` },
+    { name: '模块', path: `/${locale}/modules` },
+  ];
+
   return (
-    <nav className="border-b border-[var(--border)] px-6 py-4">
-      <div className="mx-auto flex max-w-7xl items-center justify-between">
-        <Link href="/" className="text-lg font-bold text-[var(--accent)]">
-          claude-harness
-        </Link>
-        <div className="flex items-center gap-6 text-sm">
-          <Link href="/articles" className={`hover:text-[var(--accent)] ${pathname === "/articles" ? "text-[var(--accent)]" : ""}`}>
-            {t("articles")}
+    <nav>
+      <Link href={`/${locale}`} className="nav-logo">
+        <div className="dot"></div>
+        Claude Harness
+      </Link>
+      <div className="nav-links">
+        {navItems.map((item) => (
+          <Link
+            key={item.path}
+            href={item.path}
+            className={cn(
+              pathname === item.path ? "active" : ""
+            )}
+          >
+            {item.name}
           </Link>
-          <Link href="/code" className={`hover:text-[var(--accent)] ${pathname.startsWith("/code") ? "text-[var(--accent)]" : ""}`}>
-            {t("code")}
-          </Link>
-          <Link href="/modules" className={`hover:text-[var(--accent)] ${pathname === "/modules" ? "text-[var(--accent)]" : ""}`}>
-            {t("modules")}
-          </Link>
-          <LocaleSwitcher />
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="nav-search">
+          <Search className="h-3 w-3" />
+          <span>搜索...</span>
+          <kbd>⌘K</kbd>
         </div>
+        <LocaleSwitcher />
       </div>
     </nav>
+  );
+}
+
+export function Footer() {
+  const pathname = usePathname();
+
+  const segments = pathname.split('/').filter(Boolean);
+  const isArticleDetail = segments.length >= 3 && segments[1] === 'articles';
+  if (isArticleDetail) return null;
+
+  return (
+    <footer>
+      <div>&copy; 2026 Claude Harness. 深入解析 Claude Code 源码。</div>
+      <div style={{ display: 'flex', gap: '24px' }}>
+        <a href="#">GitHub</a>
+        <a href="#">Twitter</a>
+        <a href="#">Discord</a>
+      </div>
+    </footer>
   );
 }

@@ -2,7 +2,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
-import { Nav } from "@/components/Nav";
+import { Nav, Footer } from "@/components/Nav";
 
 interface Props {
   children: React.ReactNode;
@@ -22,8 +22,10 @@ export default async function LocaleLayout({ children, params }: Props) {
     <html lang={locale}>
       <body>
         <NextIntlClientProvider messages={messages}>
+          <div className="grid-bg"></div>
           <Nav />
-          <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
+          {children}
+          <Footer />
         </NextIntlClientProvider>
       </body>
     </html>
