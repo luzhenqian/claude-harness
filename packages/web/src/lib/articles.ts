@@ -5,17 +5,18 @@ import matter from "gray-matter";
 import { existsSync } from "node:fs";
 
 function findArticlesBase(): string {
-  // Try multiple candidate paths to handle all environments
   const candidates = [
-    resolve(process.cwd(), "content/articles"),
     resolve(process.cwd(), "../../content/articles"),
+    resolve(process.cwd(), "content/articles"),
     resolve(process.cwd(), "../content/articles"),
-    resolve(process.cwd(), "packages/web/../../content/articles"),
   ];
   for (const c of candidates) {
-    if (existsSync(c)) return c;
+    if (existsSync(c)) {
+      console.log(`[articles] Found articles at: ${c}`);
+      return c;
+    }
   }
-  // Fallback
+  console.error(`[articles] No articles directory found! cwd=${process.cwd()}, tried: ${candidates.join(", ")}`);
   return candidates[0];
 }
 const ARTICLES_BASE = findArticlesBase();

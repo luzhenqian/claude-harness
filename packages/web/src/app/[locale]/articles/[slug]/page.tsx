@@ -16,11 +16,13 @@ export async function generateStaticParams() {
   for (const locale of ["en", "zh", "ja"]) {
     try {
       const articles = await getArticleList(locale);
+      console.log(`[generateStaticParams] ${locale}: found ${articles.length} articles`);
       for (const a of articles) slugs.add(a.slug);
-    } catch {
-      // locale dir may not exist
+    } catch (e) {
+      console.log(`[generateStaticParams] ${locale}: ${e}`);
     }
   }
+  console.log(`[generateStaticParams] Total slugs: ${slugs.size}`);
   return [...slugs].map((slug) => ({ slug }));
 }
 
