@@ -24,9 +24,12 @@ function isNativeMermaidType(chart: string): boolean {
   const t = chart.trim();
   return (
     /^sequenceDiagram/i.test(t) ||
-    /^stateDiagram/i.test(t) ||
     /^classDiagram/i.test(t)
   );
+}
+
+function isStateDiagram(chart: string): boolean {
+  return /^stateDiagram/i.test(chart.trim());
 }
 
 // ─── Color Palette ────────────────────────────────────────────────
@@ -200,6 +203,54 @@ function parseChart(chart: string): ParsedChart {
 
 // ─── Custom Graph Renderer ────────────────────────────────────────
 
+// ─── State Diagram Parser ────────────────────────────────────────
+
+function parseStateDiagram(chart: string): ParsedChart {
+  const nodes = new Map<string, ParsedNode>();
+  const edges: ParsedEdge[] = [];
+  const nodeStyles = new Map<string, string>();
+
+  // Ensure [*] start/end nodes exist
+  const ensureNode = (id: string) => {
+    if (nodes.has(id)) return;
+    if (id === "__start__" || id === "__end__") {
+      nodes.set(id, { id, title: id === "__start__" ? "●" : "◎", shape: "round" });
+    } else {
+      nodes.set(id, { id, title: id, shape: "box" });
+    }
+  };
+
+  for (const line of chart.split("\n")) {
+    const trimmed = line.trim();
+    if (/^stateDiagram/i.test(trimmed) || !trimmed) continue;
+    if (/^direction\s/i.test(trimmed)) continue;
+
+    // State transition: StateA --> StateB: label
+    // Also handles [*] --> StateA and StateA --> [*]
+    const transMatch = trimmed.match(
+      /^(\[\*\]|\w+)\s*-->\s*(\[\*\]|\w+)(?:\s*:\s*(.+))?$/
+    );
+    if (transMatch) {
+      // Map [*] to start/end nodes based on context
+      let from = transMatch[1];
+      let to = transMatch[2];
+      const label = transMatch[3]?.trim();
+
+      // First [*] is start, last [*] is end
+      if (from === "[*]") from = "__start__";
+      if (to === "[*]") to = "__end__";
+
+      ensureNode(from);
+      ensureNode(to);
+      edges.push({ from, to, label });
+    }
+  }
+
+  return { direction: "TD", nodes, edges, subgraphs: [], nodeStyles };
+}
+
+// ─── Custom Graph Renderer ────────────────────────────────────────
+
 /** Check if this is a side-by-side comparison (e.g. serial vs parallel) */
 function isComparisonDiagram(
   subgraphs: ParsedSubgraph[],
@@ -217,7 +268,7 @@ function isComparisonDiagram(
 }
 
 function CustomGraphDiagram({ chart }: { chart: string }) {
-  const parsed = parseChart(chart);
+  const parsed = isStateDiagram(chart) ? parseStateDiagram(chart) : parseChart(chart);
   const { direction, nodes, edges, subgraphs } = parsed;
   const isHorizontal = direction === "LR";
 
@@ -525,6 +576,10 @@ function FlowDiagram({
         return w;
       };
       const estimateNodeSize = (node: ParsedNode) => {
+        // Start/end state markers are small circles
+        if (node.id === "__start__" || node.id === "__end__") {
+          return { width: 20, height: 20 };
+        }
         const titleW = measureTextWidth(node.title, 13);
         const descW = node.desc ? measureTextWidth(node.desc, 11.5) : 0;
         const contentW = Math.max(titleW, descW);
@@ -626,10 +681,8 @@ function FlowDiagram({
   return (
     <div className="custom-diagram" style={{ display: "flex", justifyContent: "center" }}>
       <svg
-        width={width + PAD * 2}
-        height={height + PAD * 2}
         viewBox={`${-PAD} ${-PAD} ${width + PAD * 2} ${height + PAD * 2}`}
-        style={{ maxWidth: "100%", height: "auto" }}
+        style={{ display: "block", width: "100%", height: "auto" }}
       >
         <defs>
           <marker
@@ -709,6 +762,22 @@ function FlowDiagram({
           const globalIdx = [...nodes.keys()].indexOf(id);
           const pal = getPalette(node.paletteIdx ?? globalIdx);
           const isDecision = node.shape === "decision";
+          const isStartEnd = id === "__start__" || id === "__end__";
+
+          // Start/end state circles
+          if (isStartEnd) {
+            const cx = pos.x + pos.width / 2;
+            const cy = pos.y + pos.height / 2;
+            const r = 8;
+            return (
+              <g key={id}>
+                <circle cx={cx} cy={cy} r={r} fill="#e2e8f0" stroke="#94a3b8" strokeWidth="2" />
+                {id === "__end__" && (
+                  <circle cx={cx} cy={cy} r={4} fill="#94a3b8" />
+                )}
+              </g>
+            );
+          }
 
           return (
             <g key={id}>
