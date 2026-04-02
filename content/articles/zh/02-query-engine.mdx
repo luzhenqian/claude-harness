@@ -31,13 +31,38 @@ modules: ["QueryEngine.ts", "query.ts", "query/", "services/api/"]
 // src/QueryEngine.ts:184-207
 export class QueryEngine {
   private config: QueryEngineConfig
-  private mutableMessages: Message[]      // 跨轮次的完整消息历史
-  private abortController: AbortController // 用户中断信号
-  private permissionDenials: SDKPermissionDenial[] // 权限拒绝记录
-  private totalUsage: NonNullableUsage     // 累计 token 使用量
+  // 核心对话历史数组，跨轮次持续累积。这是整个引擎中为数不多的可变状态——
+  // 每轮对话的用户消息、助手响应、工具结果都会追加到这里。
+  // 在 Claude Code 偏爱不可变数据的整体设计中，这是一个有意的例外。
+  private mutableMessages: Message[]
+  // 用户中断信号控制器。当用户按下 Ctrl+C 时触发 .abort()，
+  // 所有正在进行的异步操作（API 调用、工具执行）会通过 signal 感知到中断并优雅退出。
+  private abortController: AbortController
+  // 记录所有被用户拒绝的工具调用（工具名、调用 ID、输入参数）。
+  // 这些记录最终会包含在 SDK 返回的 result 消息中，
+  // 让调用方（如 Claude Desktop）知道哪些操作被用户拒绝了。
+  private permissionDenials: SDKPermissionDenial[]
+  // 整个会话期间的累计 API token 使用量（input_tokens + output_tokens）。
+  // 每次 API 响应返回时通过 accumulateUsage() 更新，用于计费和 maxBudgetUsd 检查。
+  // 在整个引擎生命周期内只增不减。
+  private totalUsage: NonNullableUsage
+  // 确保 orphanedPermission（孤立权限恢复）在引擎生命周期内最多处理一次。
+  // 当工具调用在上一个会话中被拒绝但需要特殊恢复处理时使用，
+  // 避免重复触发恢复逻辑。
   private hasHandledOrphanedPermission = false
-  private readFileState: FileStateCache    // 已读文件缓存（避免重复读取）
+  // 文件状态缓存，记录已读文件的修改时间、大小和内容哈希。
+  // 当 AI 通过 FileReadTool 读取文件后，内容被缓存在这里。
+  // 后续再次引用同一文件时，引擎可以避免重复发送完整内容到 API，节省 token。
+  // 还用于检测文件是否在读取后被意外修改。
+  private readFileState: FileStateCache
+  // 当前轮次中发现的技能名称集合（turn-scoped）。
+  // 每轮 submitMessage() 开始时通过 .clear() 清除，
+  // 防止长时间 SDK 会话中集合无限增长。
+  // 用于 tengu_skill_tool_invocation 遥测事件的 was_discovered 字段。
   private discoveredSkillNames = new Set<string>()
+  // 记录已加载的嵌套记忆文件路径，避免同一记忆文件被重复加载。
+  // 跨轮次持久化——不同于 discoveredSkillNames，不会每轮清除，
+  // 因为记忆加载是全局性的，重复加载只会浪费 token。
   private loadedNestedMemoryPaths = new Set<string>()
 
   constructor(config: QueryEngineConfig) {
@@ -66,29 +91,88 @@ export class QueryEngine {
 ```typescript
 // src/QueryEngine.ts:130-173（关键字段）
 export type QueryEngineConfig = {
-  cwd: string                    // 工作目录
-  tools: Tools                   // 可用工具列表
-  commands: Command[]            // 斜杠命令列表
-  mcpClients: MCPServerConnection[] // MCP 客户端连接
-  agents: AgentDefinition[]      // Agent 定义
-  canUseTool: CanUseToolFn       // 工具权限检查函数
-  getAppState: () => AppState    // 获取应用状态
+  // 工作目录路径。每轮开始时通过 setCwd(cwd) 设置，
+  // 决定了所有文件操作和工具执行的基准路径。
+  cwd: string
+  // 可用工具列表（Bash、Read、Write、Grep 等 40+ 工具）。
+  // 传递给 fetchSystemPromptParts() 构建系统提示中的工具描述，
+  // 同时通过 ProcessUserInputContext 传入工具执行层。
+  // 还用于检查是否包含 SYNTHETIC_OUTPUT_TOOL_NAME 以启用结构化输出。
+  tools: Tools
+  // 斜杠命令列表（如 /help、/config、/force-snip）。
+  // 由 processUserInput() 消费，用于识别和执行用户输入中的本地命令。
+  commands: Command[]
+  // Model Context Protocol 服务器连接数组，用于接入外部工具和资源。
+  // 传递给系统提示生成和协调器模式上下文，
+  // 使 Claude 能发现并使用 MCP 服务器提供的扩展工具。
+  mcpClients: MCPServerConnection[]
+  // 可用的 Agent 定义列表。Claude 可以通过 Agent 工具调用这些 agent，
+  // 将复杂任务委托给专门的子 agent 处理（如代码审查、测试运行等）。
+  agents: AgentDefinition[]
+  // 工具权限检查回调。每次工具执行前调用，返回 'allow'、'deny' 等权限决策。
+  // 引擎会包装此函数以追踪拒绝记录到 permissionDenials 中，
+  // 但不改变原始权限判断逻辑。
+  canUseTool: CanUseToolFn
+  // 获取当前应用状态的 getter。包含工具权限上下文、fast mode 开关、
+  // 文件历史、归因状态等。在每轮开始时被调用以捕获初始状态快照。
+  getAppState: () => AppState
+  // 以不可变方式更新应用状态的 setter。接受一个 (prev) => next 函数，
+  // 用于在查询期间持久化权限授予、文件历史更新等状态变更。
   setAppState: (f: (prev: AppState) => AppState) => void
-  initialMessages?: Message[]    // 初始消息历史（恢复会话时使用）
-  readFileCache: FileStateCache  // 文件状态缓存
-  customSystemPrompt?: string    // 自定义系统提示
-  appendSystemPrompt?: string    // 追加系统提示
-  userSpecifiedModel?: string    // 用户指定模型
-  fallbackModel?: string         // 备用模型
-  thinkingConfig?: ThinkingConfig // 思考模式配置
-  maxTurns?: number              // 最大轮次限制
-  maxBudgetUsd?: number          // 预算限制（美元）
-  taskBudget?: { total: number } // 任务预算
-  jsonSchema?: Record<string, unknown> // 结构化输出 schema
+  // 可选的初始消息历史，用于恢复已有会话（--resume 功能）。
+  // 如果提供，引擎会从这些消息的基础上继续对话，而不是从空白开始。
+  initialMessages?: Message[]
+  // 文件状态缓存实例，记录已读文件的元数据（修改时间、大小、内容哈希）。
+  // 在 SDK 场景下可跨会话持久化，避免重复读取未变化的文件。
+  readFileCache: FileStateCache
+  // 自定义系统提示。如果提供，会**完全替换**默认系统提示（而非追加）。
+  // 当同时设置了 CLAUDE_COWORK_MEMORY_PATH_OVERRIDE 环境变量时，
+  // 还会触发记忆机制提示的加载。
+  customSystemPrompt?: string
+  // 追加到系统提示末尾的额外指令（如来自 CLAUDE.md 的项目级规则）。
+  // 无论是否有 customSystemPrompt，这些内容始终被追加，
+  // 确保项目级规则不会被自定义提示覆盖。
+  appendSystemPrompt?: string
+  // 用户通过 SDK 指定的模型 ID（如 "claude-sonnet-4-20250514"）。
+  // 通过 parseUserSpecifiedModel() 解析后覆盖默认模型选择。
+  // 可通过 setModel() 方法在后续查询中动态更新。
+  userSpecifiedModel?: string
+  // 备用模型 ID。当主模型不可用或遇到 FallbackTriggeredError 时，
+  // 引擎自动切换到此模型继续工作，实现优雅降级。
+  fallbackModel?: string
+  // 思考模式配置：{ type: 'adaptive' | 'disabled' }。
+  // 'adaptive' 启用 Claude 的扩展思考能力（thinking tokens），
+  // 让模型在复杂推理时使用额外的思考空间。
+  thinkingConfig?: ThinkingConfig
+  // 最大工具调用轮次限制。超过此数值后引擎停止循环，
+  // yield 错误结果 "Reached maximum number of turns"。
+  // 用于防止 agent 陷入无限工具调用循环。
+  maxTurns?: number
+  // 单次会话的最大 USD 花费限制。每次 API 响应后检查累计花费，
+  // 超限则 yield "Reached maximum budget ($X)" 并终止。
+  // 为 SDK 使用场景提供成本控制。
+  maxBudgetUsd?: number
+  // 任务级预算对象，用于多 agent 场景下的独立预算管理。
+  // 每个子 agent 可以有自己的预算上限，不影响全局预算。
+  taskBudget?: { total: number }
+  // JSON Schema 定义，用于结构化输出验证。
+  // 提供后引擎会通过 registerStructuredOutputEnforcement() 注册验证逻辑，
+  // 确保 Claude 的响应符合预期的 JSON 结构。验证失败最多重试 5 次。
+  jsonSchema?: Record<string, unknown>
+  // 启用详细日志和调试输出，影响工具执行和 hook 的日志级别。
   verbose?: boolean
+  // 是否将处理后的用户消息作为"回放"事件 yield 回 SDK 调用方。
+  // 用于需要确认用户输入已被接收和处理的 SDK 场景。
   replayUserMessages?: boolean
+  // URL 引出（elicitation）处理器。当 MCP 服务器返回 -32042 错误码时触发，
+  // 用于打开浏览器进行 OAuth 认证等需要用户交互的流程。
+  // 允许 SDK 自定义如何处理这类交互请求。
   handleElicitation?: ToolUseContext['handleElicitation']
-  snipReplay?: (            // Snip 边界处理器
+  // 历史消息裁剪（snip）处理器，仅在 HISTORY_SNIP feature flag 启用时生效。
+  // 当 yield 到系统消息（压缩边界标记）时被调用，
+  // 判断是否需要裁剪历史消息以控制长时间 headless/SDK 会话的内存占用。
+  // 返回 undefined 表示不需要裁剪，否则返回裁剪后的消息数组。
+  snipReplay?: (
     yieldedSystemMsg: Message,
     store: Message[],
   ) => { messages: Message[]; executed: boolean } | undefined
@@ -106,8 +190,15 @@ export type QueryEngineConfig = {
 ```typescript
 // src/QueryEngine.ts:209-212
 async *submitMessage(
+  // 用户输入内容：可以是纯文本字符串，也可以是结构化的内容块数组
+  // （如包含图片、文件引用等多模态输入）
   prompt: string | ContentBlockParam[],
-  options?: { uuid?: string; isMeta?: boolean }
+  options?: {
+    uuid?: string      // 消息的唯一标识符，用于会话持久化和恢复时关联消息
+    isMeta?: boolean   // 标记为元消息（如恢复消息），不计入用户实际输入的统计
+  }
+  // 返回异步生成器，逐步 yield SDKMessage 事件（助手文本、工具调用、错误等），
+  // 调用者通过 for await...of 消费这些事件来驱动 UI 渲染
 ): AsyncGenerator<SDKMessage, void, unknown>
 ```
 
@@ -117,9 +208,15 @@ async *submitMessage(
 
 ```typescript
 // src/QueryEngine.ts:238-241
-this.discoveredSkillNames.clear()  // 清除上一轮发现的技能
-setCwd(cwd)                        // 设置工作目录
+// 清除上一轮发现的技能名称集合，确保技能发现是 turn-scoped 的——
+// 长时间运行的 SDK 会话不会因为集合无限增长而浪费内存
+this.discoveredSkillNames.clear()
+// 将全局工作目录设置为配置中的 cwd，后续所有文件操作和工具执行以此为基准
+setCwd(cwd)
+// 检查是否启用了会话持久化（默认启用，可通过环境变量或 --bare 模式禁用）。
+// 启用时，用户消息和助手响应会写入磁盘，支持 --resume 恢复功能
 const persistSession = !isSessionPersistenceDisabled()
+// 记录本轮开始时间，用于后续计算响应延迟和遥测事件
 const startTime = Date.now()
 ```
 
@@ -129,15 +226,21 @@ const startTime = Date.now()
 
 ```typescript
 // src/QueryEngine.ts:244-271（简化）
+// 包装原始的 canUseTool 回调，在不改变权限判断逻辑的前提下，
+// 增加一层拒绝记录追踪。这是装饰器模式的典型应用。
 const wrappedCanUseTool: CanUseToolFn = async (tool, input, ...) => {
+  // 调用原始的权限检查函数，返回 'allow'、'deny'、'ask' 等行为决策
   const result = await canUseTool(tool, input, ...)
 
-  // 追踪拒绝，用于 SDK 上报
+  // 当工具被拒绝时，记录拒绝详情（工具名、调用 ID、输入参数）。
+  // 这些记录最终包含在 SDK 返回的 result 消息中，
+  // 让调用方（如 Claude Desktop）知道哪些操作被用户拒绝了，
+  // 可用于审计、日志或向用户展示。
   if (result.behavior !== 'allow') {
     this.permissionDenials.push({
-      tool_name: sdkCompatToolName(tool.name),
-      tool_use_id: toolUseID,
-      tool_input: input,
+      tool_name: sdkCompatToolName(tool.name), // 转换为 SDK 兼容的工具名格式
+      tool_use_id: toolUseID,                  // 关联到具体的 tool_use 块
+      tool_input: input,                       // 保留原始输入以供审计
     })
   }
 
@@ -154,32 +257,43 @@ const wrappedCanUseTool: CanUseToolFn = async (tool, input, ...) => {
 ```typescript
 // src/QueryEngine.ts:335-395（关键字段）
 let processUserInputContext: ProcessUserInputContext = {
+  // 引用 mutableMessages 数组，query() 通过此引用读取和追加消息
   messages: this.mutableMessages,
+  // 闭包式 setter：允许斜杠命令（如 /force-snip）替换整个消息数组。
+  // 通过捕获 this 引用，确保替换后 QueryEngine 的内部状态也同步更新。
   setMessages: fn => {
     this.mutableMessages = fn(this.mutableMessages)
   },
+  // SDK/headless 模式下无需处理 API Key 变更，所以用空函数占位
   onChangeAPIKey: () => {},
+  // URL 引出处理器，用于 MCP 服务器触发的 OAuth 等浏览器交互流程
   handleElicitation: this.config.handleElicitation,
   options: {
-    commands,
-    tools,
-    verbose,
-    mainLoopModel: initialMainLoopModel,
-    thinkingConfig: initialThinkingConfig,
-    mcpClients,
-    isNonInteractiveSession: true,
-    customSystemPrompt,
-    appendSystemPrompt,
+    commands,                    // 可用斜杠命令列表
+    tools,                       // 可用工具列表（含 MCP 工具）
+    verbose,                     // 是否启用详细日志
+    mainLoopModel: initialMainLoopModel,     // 主循环使用的模型
+    thinkingConfig: initialThinkingConfig,   // 扩展思考配置
+    mcpClients,                  // MCP 服务器连接
+    isNonInteractiveSession: true, // SDK 模式始终为非交互式
+    customSystemPrompt,          // 自定义系统提示（替换默认）
+    appendSystemPrompt,          // 追加系统提示（CLAUDE.md 等）
+    // activeAgents：当前可用的 agent 定义；allAgents 在 SDK 模式下为空
     agentDefinitions: { activeAgents: agents, allAgents: [] },
-    maxBudgetUsd,
+    maxBudgetUsd,                // 最大花费限制（美元）
   },
-  getAppState,
-  setAppState,
-  abortController: this.abortController,
-  readFileState: this.readFileState,
+  getAppState,                   // 应用状态 getter
+  setAppState,                   // 应用状态 setter（不可变更新）
+  abortController: this.abortController, // 中断信号，用于取消进行中的操作
+  readFileState: this.readFileState,     // 文件读取缓存
+  // 嵌套记忆附件触发器：记录哪些模式可以触发自动加载嵌套记忆文件。
+  // 每轮重新创建（turn-scoped），因为触发条件可能因斜杠命令而变化。
   nestedMemoryAttachmentTriggers: new Set<string>(),
+  // 已加载的嵌套记忆路径集合（跨轮次持久化），防止重复加载
   loadedNestedMemoryPaths: this.loadedNestedMemoryPaths,
+  // 动态技能目录触发器：记录哪些目录变化应触发技能重新发现
   dynamicSkillDirTriggers: new Set<string>(),
+  // 当前轮次发现的技能名称集合（turn-scoped），用于遥测
   discoveredSkillNames: this.discoveredSkillNames,
   // ...更多字段
 }
@@ -217,10 +331,12 @@ flowchart TD
 
 ```typescript
 // src/QueryEngine.ts:289-325（简化）
+// 获取系统提示的各个组成部分：默认提示、用户上下文、系统上下文。
+// 这个函数会根据工具列表和模型能力动态生成提示内容。
 const {
-  defaultSystemPrompt,
-  userContext: baseUserContext,
-  systemContext,
+  defaultSystemPrompt,       // 默认系统提示数组（包含工具描述、安全规范、行为指令）
+  userContext: baseUserContext, // 动态用户上下文（工作目录、平台、时间等），每次请求可能变化
+  systemContext,             // 静态系统上下文（已安装的 MCP 服务器列表等），整个会话期间稳定
 } = await fetchSystemPromptParts({
   tools,
   mainLoopModel: initialMainLoopModel,
@@ -228,19 +344,26 @@ const {
   customSystemPrompt: customPrompt,
 })
 
-// 合并协调器模式的用户上下文
+// 合并协调器模式的用户上下文。
+// getCoordinatorUserContext() 添加 scratchpad 目录路径等协调器特有的上下文信息，
+// 使 Claude 在协调器模式下能正确使用共享工作空间。
 const userContext = {
   ...baseUserContext,
   ...getCoordinatorUserContext(mcpClients, scratchpadDir),
 }
 
-// 条件性加载记忆机制提示
+// 条件性加载记忆机制提示。只有同时满足两个条件才启用：
+// 1. 存在自定义系统提示（customPrompt !== undefined）
+// 2. 设置了 CLAUDE_COWORK_MEMORY_PATH_OVERRIDE 环境变量
+// 这确保记忆系统操作指令只在 cowork 等特定场景下注入。
 const memoryMechanicsPrompt =
   customPrompt !== undefined && hasAutoMemPathOverride()
     ? await loadMemoryPrompt()
     : null
 
-// 最终组合
+// 最终组合：按优先级拼接各层提示。
+// 如果有自定义提示，它替换（而非追加）默认提示；
+// 记忆机制和追加提示始终在末尾，确保不被覆盖。
 const systemPrompt = asSystemPrompt([
   ...(customPrompt !== undefined ? [customPrompt] : defaultSystemPrompt),
   ...(memoryMechanicsPrompt ? [memoryMechanicsPrompt] : []),
@@ -275,12 +398,12 @@ const systemPrompt = asSystemPrompt([
 ```typescript
 // src/query.ts:219-228
 export async function* query(params: QueryParams): AsyncGenerator<
-  | StreamEvent
-  | RequestStartEvent
-  | Message
-  | TombstoneMessage
-  | ToolUseSummaryMessage,
-  Terminal
+  | StreamEvent           // API 流式响应事件（token 级别），驱动 UI 实时渲染文本
+  | RequestStartEvent     // 每次 API 请求开始时触发，携带请求参数用于调试和遥测
+  | Message               // 完整的助手/系统消息，包含 content blocks 和元数据
+  | TombstoneMessage      // 墓碑消息：标记已被压缩/折叠的历史消息，用于 UI 显示"已压缩"提示
+  | ToolUseSummaryMessage, // 工具调用摘要：异步生成的工具执行结果概要，用于 SDK 上报
+  Terminal                // 生成器的最终返回值，包含终止原因（completed/error/budget_exceeded 等）
 >
 ```
 
@@ -301,12 +424,17 @@ export async function* query(params: QueryParams): AsyncGenerator<
 ```typescript
 // src/query.ts:219-239
 export async function* query(params: QueryParams): AsyncGenerator<...> {
+  // 收集本次查询中消费的斜杠命令 UUID，用于在查询正常完成后通知命令生命周期
   const consumedCommandUuids: string[] = []
+  // yield* 将 queryLoop() 的所有 yield 值"透传"给 query() 的调用者，
+  // 同时也透传 throw（异常冒泡）和 .return()（双层生成器都被关闭）。
+  // 这是生成器组合的核心模式——queryLoop 负责实际循环，query 负责善后。
   const terminal = yield* queryLoop(params, consumedCommandUuids)
-  // 只在正常完成时到达这里
-  // throw 时错误通过 yield* 传播
-  // .return() 时两个生成器都被关闭
+  // 只有正常完成时才会执行到这里。
+  // 如果 queryLoop() 抛出异常，异常直接传播到调用者，不会到达此处；
+  // 如果调用者调用 .return()，两个生成器都被优雅关闭。
   for (const uuid of consumedCommandUuids) {
+    // 通知每个被消费的命令已完成，触发命令级别的清理和状态更新
     notifyCommandLifecycle(uuid, 'completed')
   }
   return terminal
@@ -320,16 +448,36 @@ export async function* query(params: QueryParams): AsyncGenerator<...> {
 ```typescript
 // src/query.ts:204-217
 type State = {
+  // 当前迭代的消息数组。注意：这不是 QueryEngine.mutableMessages 的引用，
+  // 而是每次迭代可能被替换的副本（如恢复策略注入消息后创建新数组）。
   messages: Message[]
+  // 工具执行上下文，包含权限检查、中断控制器、应用状态等工具运行时所需的一切
   toolUseContext: ToolUseContext
+  // 自动压缩跟踪状态：记录 token 使用量的警告阈值和已触发的压缩次数。
+  // undefined 表示自动压缩未启用（如 maxTurns 场景下禁用以避免干扰）。
   autoCompactTracking: AutoCompactTrackingState | undefined
-  maxOutputTokensRecoveryCount: number   // 已重试次数（最多 3 次）
-  hasAttemptedReactiveCompact: boolean   // 是否已尝试反应式压缩
+  // max_output_tokens 错误的已重试次数。上限为 MAX_OUTPUT_TOKENS_RECOVERY_LIMIT = 3，
+  // 超过后停止重试，将暂扣的错误消息 yield 给调用者。
+  maxOutputTokensRecoveryCount: number
+  // 是否已尝试过反应式压缩（prompt_too_long 恢复）。
+  // 设为 true 后不会再次尝试——如果压缩后仍然溢出，说明有更根本的问题。
+  hasAttemptedReactiveCompact: boolean
+  // 输出 token 上限覆盖值。首次遇到 max_output_tokens 时从 undefined 升级到
+  // ESCALATED_MAX_TOKENS (64K)，实现"零成本"恢复——不注入消息，只提升上限。
   maxOutputTokensOverride: number | undefined
+  // 异步生成的工具调用摘要 Promise。工具执行完成后在后台生成摘要，
+  // 在下一次循环迭代时检查是否完成并 yield 给调用者。
   pendingToolUseSummary: Promise<ToolUseSummaryMessage | null> | undefined
+  // Stop Hook 是否正在活跃执行。用于防止 hook 执行期间的竞态条件，
+  // 确保同一时间只有一个 stop hook 在运行。
   stopHookActive: boolean | undefined
-  turnCount: number                     // 当前轮次计数
-  transition: Continue | undefined       // 上一次循环为何继续
+  // 当前轮次计数（从 0 开始）。每次循环迭代递增，
+  // 用于 maxTurns 检查和遥测事件中的轮次追踪。
+  turnCount: number
+  // 上一次循环迭代继续的原因。值为 Continue 类型，
+  // 如 { reason: 'max_output_tokens_recovery', attempt: 2 }。
+  // 双重作用：控制恢复流程走向 + 为测试提供可观测性（断言 transition.reason）。
+  transition: Continue | undefined
 }
 ```
 
@@ -384,18 +532,33 @@ stateDiagram-v2
 ```typescript
 // src/query.ts:181-199
 export type QueryParams = {
+  // 完整的消息历史数组，包含之前所有轮次的用户消息、助手响应和工具结果
   messages: Message[]
+  // 组合后的系统提示（默认/自定义 + 记忆机制 + 追加提示），定义 Claude 的行为规范
   systemPrompt: SystemPrompt
+  // 动态用户上下文（工作目录、平台、时间等），以 key-value 格式注入到每次请求的用户消息前
   userContext: { [k: string]: string }
+  // 静态系统上下文（MCP 服务器列表等），以 key-value 格式注入到系统消息末尾
   systemContext: { [k: string]: string }
+  // 权限检查函数（已被 QueryEngine 包装过，含拒绝追踪逻辑）
   canUseTool: CanUseToolFn
+  // 工具执行上下文：包含中断控制器、应用状态访问、文件缓存等工具运行时依赖
   toolUseContext: ToolUseContext
+  // 备用模型 ID，当主模型不可用时自动切换
   fallbackModel?: string
+  // 查询来源标识（'repl' | 'sdk' | 'task' 等），影响恢复策略和遥测分类
   querySource: QuerySource
+  // 输出 token 上限覆盖值，用于 max_output_tokens 恢复时提升到 64K
   maxOutputTokensOverride?: number
+  // 最大工具调用轮次限制，防止 agent 陷入无限循环
   maxTurns?: number
+  // 是否跳过 prompt cache 写入。在恢复/重试场景下设为 true，
+  // 避免因消息微调而浪费缓存写入配额
   skipCacheWrite?: boolean
+  // 任务级预算对象，用于多 agent 场景下的独立成本控制
   taskBudget?: { total: number }
+  // 依赖注入点：生产环境使用 productionDeps，测试中可替换为模拟实现。
+  // 包含 API 调用、工具执行等核心能力的具体实现。
   deps?: QueryDeps
 }
 ```
@@ -405,8 +568,14 @@ export type QueryParams = {
 ```typescript
 // src/query/deps.ts
 export type QueryDeps = {
-  // API 调用、工具运行等核心依赖
+  // 封装了 query() 循环中所有外部副作用的接口：
+  // - streamChat: 调用 Anthropic API 的流式聊天接口
+  // - runTool: 执行单个工具调用并返回结果
+  // - handleToolResult: 处理工具执行结果（预算控制、缓存等）
+  // - logEvent: 发送遥测事件
+  // 将这些副作用抽象为接口，使 query() 的核心逻辑可以独立于具体实现进行测试。
 }
+// 生产环境的具体实现，连接真实的 API 和工具执行层
 export const productionDeps: QueryDeps = { ... }
 ```
 
@@ -465,24 +634,31 @@ sequenceDiagram
 
 ```typescript
 // src/query.ts:123-149
+// 为所有未完成的工具调用生成错误类型的 tool_result 消息。
+// Anthropic API 要求每个 tool_use 必须有对应的 tool_result，
+// 否则后续 API 调用会返回格式错误。
+// 典型触发场景：用户按 Ctrl+C 中断、进程崩溃、超时等。
 function* yieldMissingToolResultBlocks(
-  assistantMessages: AssistantMessage[],
-  errorMessage: string,
+  assistantMessages: AssistantMessage[], // 包含未完成 tool_use 的助手消息
+  errorMessage: string,                  // 错误描述（如 "Tool execution was aborted"）
 ) {
   for (const assistantMessage of assistantMessages) {
+    // 从助手消息的 content 数组中筛选出所有 tool_use 块
     const toolUseBlocks = assistantMessage.message.content.filter(
       content => content.type === 'tool_use',
     ) as ToolUseBlock[]
 
     for (const toolUse of toolUseBlocks) {
+      // 为每个 tool_use 生成一条对应的 tool_result 用户消息
       yield createUserMessage({
         content: [{
           type: 'tool_result',
-          content: errorMessage,
-          is_error: true,
-          tool_use_id: toolUse.id,
+          content: errorMessage,    // 错误描述文本
+          is_error: true,           // 标记为错误结果，AI 会据此调整后续行为
+          tool_use_id: toolUse.id,  // 通过 ID 关联到对应的 tool_use 块
         }],
         toolUseResult: errorMessage,
+        // 关联到产生此 tool_use 的助手消息，用于 UI 渲染时的消息分组
         sourceToolAssistantUUID: assistantMessage.uuid,
       })
     }
@@ -508,10 +684,15 @@ function* yieldMissingToolResultBlocks(
 
 ```typescript
 // src/query.ts:175-179
-// isWithheldMaxOutputTokens 检查一条消息是否是被暂扣的 max_output_tokens 错误
+// 类型守卫函数：检查一条消息是否是被"暂扣"的 max_output_tokens 错误。
+// 暂扣机制的核心——引擎不会立即 yield 此错误给调用者，
+// 而是先尝试恢复（升级 token 上限 / 注入恢复消息）。
+// 只有恢复失败后，才释放这条错误消息。
+// 返回 true 时，TypeScript 将 msg 的类型收窄为 AssistantMessage。
 function isWithheldMaxOutputTokens(
   msg: Message | StreamEvent | undefined,
 ): msg is AssistantMessage {
+  // assistant 类型 + apiError 为 'max_output_tokens' = 被暂扣的截断错误
   return msg?.type === 'assistant' && msg.apiError === 'max_output_tokens'
 }
 ```
@@ -522,12 +703,18 @@ function isWithheldMaxOutputTokens(
 
 ```typescript
 // src/query.ts:1188-1221（简化）
+// 检测到被暂扣的 max_output_tokens 错误——AI 的输出被截断了
 if (isWithheldMaxOutputTokens(lastMessage)) {
-  // 第一步：升级到 64K
+  // 第一步：尝试"零成本"恢复——将输出 token 上限从默认 8K 升级到 64K。
+  // 条件：capEnabled（功能开关启用）且 maxOutputTokensOverride 尚未设置（首次尝试）。
+  // 这是最优先的恢复策略，因为它不注入任何消息、不增加历史长度。
   if (capEnabled && maxOutputTokensOverride === undefined) {
+    // 发送遥测事件记录升级行为，用于监控此恢复路径的触发频率
     logEvent('tengu_max_tokens_escalate', {
-      escalatedTo: ESCALATED_MAX_TOKENS,
+      escalatedTo: ESCALATED_MAX_TOKENS, // 64K
     })
+    // 创建新状态：只修改 maxOutputTokensOverride 和 transition，
+    // 消息历史保持不变——重试的是完全相同的请求，只是输出上限更高
     const next: State = {
       ...state,
       maxOutputTokensOverride: ESCALATED_MAX_TOKENS,
@@ -546,26 +733,34 @@ if (isWithheldMaxOutputTokens(lastMessage)) {
 
 ```typescript
 // src/query.ts:1223-1252
+// 第二步：升级到 64K 后仍然被截断，进入多轮恢复模式。
+// 最多重试 MAX_OUTPUT_TOKENS_RECOVERY_LIMIT (3) 次。
 if (maxOutputTokensRecoveryCount < MAX_OUTPUT_TOKENS_RECOVERY_LIMIT) {
+  // 构造恢复消息——经过精心设计的 prompt，指示 AI：
+  // 1. 不要道歉或重述上下文（节省输出 token）
+  // 2. 直接从断点处继续（即使是在一个句子/代码块中间）
+  // 3. 将剩余工作拆分为更小的片段（降低再次截断的概率）
   const recoveryMessage = createUserMessage({
     content:
       `Output token limit hit. Resume directly — no apology, ` +
       `no recap of what you were doing. Pick up mid-thought ` +
       `if that is where the cut happened. Break remaining ` +
       `work into smaller pieces.`,
-    isMeta: true,
+    isMeta: true, // 标记为元消息，不计入用户实际输入的统计
   })
 
+  // 构造新状态：将截断的助手响应和恢复消息追加到消息历史，
+  // 这样 AI 能看到自己上次输出到哪里被截断了
   const next: State = {
     messages: [
-      ...messagesForQuery,
-      ...assistantMessages,
-      recoveryMessage,
+      ...messagesForQuery,     // 原始消息历史
+      ...assistantMessages,    // 被截断的助手响应（保留已有输出）
+      recoveryMessage,         // 恢复指令
     ],
     maxOutputTokensRecoveryCount: maxOutputTokensRecoveryCount + 1,
     transition: {
       reason: 'max_output_tokens_recovery',
-      attempt: maxOutputTokensRecoveryCount + 1,
+      attempt: maxOutputTokensRecoveryCount + 1, // 供测试断言的重试次数
     },
     // ...其他字段
   }
@@ -586,23 +781,32 @@ if (maxOutputTokensRecoveryCount < MAX_OUTPUT_TOKENS_RECOVERY_LIMIT) {
 
 ```typescript
 // src/query.ts:1089-1117
+// 第一级恢复：上下文折叠（Context Collapse）——轻量级压缩。
+// 三个前置条件：
+// 1. CONTEXT_COLLAPSE feature flag 已启用
+// 2. contextCollapse 实例存在（已初始化）
+// 3. 上一次迭代不是 collapse_drain_retry（防止折叠→溢出→再折叠的无限循环）
 if (
   feature('CONTEXT_COLLAPSE') &&
   contextCollapse &&
   state.transition?.reason !== 'collapse_drain_retry'
 ) {
+  // recoverFromOverflow 折叠已"阶段化"的上下文块（如已完成的工具调用链），
+  // 将详细内容替换为摘要，释放 token 空间同时保留关键信息。
   const drained = contextCollapse.recoverFromOverflow(
     messagesForQuery, querySource,
   )
+  // committed > 0 表示成功折叠了至少一个上下文块
   if (drained.committed > 0) {
     const next: State = {
-      messages: drained.messages,
+      messages: drained.messages, // 折叠后的消息数组（更短）
       transition: { reason: 'collapse_drain_retry', committed: drained.committed },
       // ...
     }
     state = next
-    continue
+    continue // 用折叠后的消息重试 API 调用
   }
+  // 如果 committed === 0，说明没有可折叠的内容，fall through 到反应式压缩
 }
 ```
 
@@ -612,12 +816,20 @@ if (
 
 ```typescript
 // src/query.ts:1119-1166
+// 第二级恢复：反应式压缩（Reactive Compact）——重量级压缩。
+// 触发条件：被暂扣的 413 错误（prompt_too_long）或媒体大小错误 + 压缩实例可用
 if ((isWithheld413 || isWithheldMedia) && reactiveCompact) {
+  // 调用 services/compact/ 中的压缩逻辑，将历史消息摘要化。
+  // tryReactiveCompact 内部会：
+  // 1. 检查 hasAttempted 标志（只允许一次尝试）
+  // 2. 检查是否被用户中断（aborted）
+  // 3. 调用 LLM 生成消息摘要，替换原始历史
   const compacted = await reactiveCompact.tryReactiveCompact({
-    hasAttempted: hasAttemptedReactiveCompact,
+    hasAttempted: hasAttemptedReactiveCompact, // 确保只尝试一次
     querySource,
     aborted: toolUseContext.abortController.signal.aborted,
     messages: messagesForQuery,
+    // cacheSafeParams 用于在压缩后重建可缓存的请求参数
     cacheSafeParams: {
       systemPrompt,
       userContext,
@@ -628,21 +840,24 @@ if ((isWithheld413 || isWithheldMedia) && reactiveCompact) {
   })
 
   if (compacted) {
+    // 构建压缩后的消息数组（包含摘要消息和压缩边界标记）
     const postCompactMessages = buildPostCompactMessages(compacted)
+    // yield 压缩后的消息给调用者，让 UI 显示"对话已压缩"提示
     for (const msg of postCompactMessages) {
       yield msg
     }
     const next: State = {
-      messages: postCompactMessages,
-      hasAttemptedReactiveCompact: true,
+      messages: postCompactMessages,  // 使用压缩后的（更短的）消息历史
+      hasAttemptedReactiveCompact: true, // 标记已尝试，不会再次触发
       transition: { reason: 'reactive_compact_retry' },
       // ...
     }
     state = next
-    continue
+    continue // 用压缩后的消息重试 API 调用
   }
 
-  // 压缩失败 — 释放暂扣的错误消息并退出
+  // 压缩失败（可能是 LLM 摘要调用本身失败）——
+  // 恢复无望，释放之前暂扣的错误消息给调用者
   yield lastMessage
   return { reason: isWithheldMedia ? 'image_error' : 'prompt_too_long' }
 }
@@ -700,12 +915,16 @@ flowchart TD
 
 ```typescript
 // src/query.ts:1258-1264
-// 当最后一条消息是 API 错误时，跳过 stop hooks
-// 模型从未产生有效响应 — hooks 评估它会创造死亡螺旋：
-// error → hook blocking → retry → error → …
+// 死亡螺旋防护：当最后一条消息是 API 错误时，跳过正常的 Stop Hooks 评估。
+// 正常流程中，Stop Hooks 会评估 AI 输出质量，可能注入反馈消息触发重试。
+// 但如果模型从未产生有效响应（只有错误），hook 评估它会创造死亡螺旋：
+// error → hook 注入更多 token → 上下文更溢出 → error → hook → …
+// 所以这里只执行 failure hooks（错误通知/日志），然后直接终止。
 if (lastMessage?.isApiErrorMessage) {
+  // executeStopFailureHooks 是 fire-and-forget 的（void），
+  // 它只做错误通知和日志记录，不会注入消息或触发重试
   void executeStopFailureHooks(lastMessage, toolUseContext)
-  return { reason: 'completed' }
+  return { reason: 'completed' } // 优雅终止，不再尝试恢复
 }
 ```
 
@@ -717,8 +936,12 @@ if (lastMessage?.isApiErrorMessage) {
 
 ```typescript
 // src/QueryEngine.ts:238
-// 每轮开始时清除 discoveredSkillNames
-// 防止长会话中技能名称集合无限增长
+// 每轮 submitMessage() 开始时清除上一轮发现的技能名称集合。
+// 这是 turn-scoped cleanup 模式的体现——技能发现状态只在当前轮次内有效。
+// 在 SDK 模式下，一个会话可能持续数小时、数百轮，
+// 如果不清除，集合会无限增长，浪费内存。
+// 但注意：集合需要在 submitMessage() 内的两次 processUserInputContext 构建之间持久化，
+// 所以不能用局部变量——它是实例字段，在每轮开始时手动清除。
 this.discoveredSkillNames.clear()
 ```
 
@@ -734,8 +957,15 @@ this.discoveredSkillNames.clear()
 
 ```typescript
 // src/QueryEngine.ts:534-538
+// 并行预加载技能和插件，避免串行等待造成的延迟。
+// Promise.all 确保两个异步操作同时进行。
 const [skills, { enabled: enabledPlugins }] = await Promise.all([
+  // 从当前工作目录扫描可用的斜杠命令工具技能（.skill 文件）
   getSlashCommandToolSkills(getCwd()),
+  // 只从缓存加载插件，不发起网络请求。
+  // 在 headless/SDK 模式下避免阻塞等待——如果缓存为空，
+  // 插件列表就为空，不会影响核心功能。
+  // 需要最新数据时可通过 /reload-plugins 命令手动刷新。
   loadAllPluginsCacheOnly(),
 ])
 ```
@@ -752,11 +982,17 @@ const [skills, { enabled: enabledPlugins }] = await Promise.all([
 
 ```typescript
 // src/QueryEngine.ts:450-463（关键逻辑）
+// 在进入 query() 循环之前，先将用户消息持久化到磁盘。
+// 这是 --resume 恢复功能的关键保障：如果进程在 API 响应之前被杀死，
+// 没有提前持久化的用户消息，下次恢复时 getLastSessionLog 会返回 null。
 if (persistSession && messagesFromUserInput.length > 0) {
   const transcriptPromise = recordTranscript(messages)
   if (isBareMode()) {
-    void transcriptPromise  // --bare 模式下不等待
+    // --bare 模式（极简输出）下不等待持久化完成，优先保证响应速度
+    void transcriptPromise
   } else {
+    // 正常模式下同步等待持久化完成，确保在 API 调用前数据已落盘。
+    // 这牺牲了少量延迟（通常 <10ms），但保证了会话的可恢复性。
     await transcriptPromise
   }
 }
@@ -772,8 +1008,14 @@ if (persistSession && messagesFromUserInput.length > 0) {
 
 ```typescript
 // src/QueryEngine.ts:727-729
+// 助手消息采用 fire-and-forget 异步持久化——不等待写入完成。
+// 原因：流式处理期间助手消息被频繁 yield（每个 content block 一条），
+// 且后续 message_delta 事件会修改最后一条消息的 usage 和 stop_reason。
+// 如果每次都 await，会严重阻塞流式管道。
+// 安全性保障：底层的 enqueueWrite 是顺序保持的（FIFO 队列），
+// 即使不 await，写入顺序也与消息顺序一致。
 if (message.type === 'assistant') {
-  void recordTranscript(messages)  // 不等待
+  void recordTranscript(messages)
 }
 ```
 

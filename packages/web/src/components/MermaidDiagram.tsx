@@ -706,12 +706,29 @@ function FlowDiagram({
             .map((p, j) => `${j === 0 ? "M" : "L"} ${p.x} ${p.y}`)
             .join(" ");
 
-          // Label at midpoint of the path
-          const midIdx = Math.floor(route.points.length / 2);
-          const p0 = route.points[midIdx - 1] || route.points[0];
-          const p1 = route.points[midIdx];
-          const labelX = (p0.x + p1.x) / 2;
-          const labelY = (p0.y + p1.y) / 2;
+          // Label at the length-based midpoint of the polyline path
+          let totalLen = 0;
+          const segLens: number[] = [];
+          for (let s = 1; s < route.points.length; s++) {
+            const dx = route.points[s].x - route.points[s - 1].x;
+            const dy = route.points[s].y - route.points[s - 1].y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            segLens.push(len);
+            totalLen += len;
+          }
+          const halfLen = totalLen / 2;
+          let accum = 0;
+          let labelX = (route.points[0].x + route.points[route.points.length - 1].x) / 2;
+          let labelY = (route.points[0].y + route.points[route.points.length - 1].y) / 2;
+          for (let s = 0; s < segLens.length; s++) {
+            if (accum + segLens[s] >= halfLen) {
+              const t = segLens[s] > 0 ? (halfLen - accum) / segLens[s] : 0;
+              labelX = route.points[s].x + t * (route.points[s + 1].x - route.points[s].x);
+              labelY = route.points[s].y + t * (route.points[s + 1].y - route.points[s].y);
+              break;
+            }
+            accum += segLens[s];
+          }
 
           // Estimate label width for CJK
           const labelW = route.label
@@ -732,7 +749,7 @@ function FlowDiagram({
                 <>
                   <rect
                     x={labelX - labelW / 2}
-                    y={labelY - 11}
+                    y={labelY - 9}
                     width={labelW}
                     height={18}
                     rx={4}
@@ -741,8 +758,9 @@ function FlowDiagram({
                   />
                   <text
                     x={labelX}
-                    y={labelY + 3}
+                    y={labelY}
                     textAnchor="middle"
+                    dominantBaseline="central"
                     fill="var(--text-muted, #94a3b8)"
                     fontSize="11"
                     fontFamily="'JetBrains Mono', monospace"
