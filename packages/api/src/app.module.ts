@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { getDatabaseConfig } from './config/database.config';
+import { AuthModule } from './auth/auth.module';
 import { User } from './auth/entities/user.entity';
 import { Conversation } from './chat/entities/conversation.entity';
 import { Message } from './chat/entities/message.entity';
@@ -21,6 +22,7 @@ import { InitialSchema1712102400000 } from './migrations/1712102400000-InitialSc
         migrations: [InitialSchema1712102400000],
       }),
     }),
+    AuthModule,
   ],
 })
 export class AppModule {}
