@@ -1,4 +1,4 @@
-import { Controller, Get, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Req, Res, UseGuards, HttpCode } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Response, Request } from 'express';
 import { ConfigService } from '@nestjs/config';
@@ -40,5 +40,11 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   getMe(@Req() req: Request) {
     return req.user;
+  }
+
+  @Post('logout')
+  @HttpCode(200)
+  logout() {
+    return { ok: true };
   }
 }
