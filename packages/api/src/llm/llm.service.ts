@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LlmProvider as LlmProviderEntity } from './entities/llm-provider.entity';
 import { LLMProvider } from './llm-provider.interface';
+import { AnthropicProvider } from './providers/anthropic.provider';
+import { GeminiProvider } from './providers/gemini.provider';
 import { OpenAIProvider } from './providers/openai.provider';
 
 @Injectable()
@@ -40,6 +42,10 @@ export class LlmService implements OnModuleInit {
     switch (record.name) {
       case 'openai':
         return new OpenAIProvider(record.apiKey, record.model, record.model);
+      case 'anthropic':
+        return new AnthropicProvider(record.apiKey, record.model);
+      case 'gemini':
+        return new GeminiProvider(record.apiKey, record.model, record.model);
       default:
         return null;
     }

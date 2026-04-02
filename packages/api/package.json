@@ -12,6 +12,8 @@
     "migration:run": "pnpm typeorm migration:run -d src/config/database.config.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
+    "@google/generative-ai": "^0.24.1",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
