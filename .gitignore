@@ -9,3 +9,9 @@ packages/web/generated
 # Claude Code source (downloaded at build time from private GitHub Release)
 packages/claude-code-source/src/
 packages/web/public/search-index.json
+
+# Worktrees
+.worktrees/
+
+# Superpowers brainstorm artifacts
+.superpowers/
