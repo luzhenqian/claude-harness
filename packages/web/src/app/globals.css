@@ -1013,7 +1013,8 @@ footer a:hover { color: var(--accent); }
 
 .prose a:hover { border-bottom-color: var(--accent); }
 
-.prose ul, .prose ol { margin-bottom: 18px; padding-left: 24px; }
+.prose ul { margin-bottom: 18px; padding-left: 24px; list-style-type: disc; }
+.prose ol { margin-bottom: 18px; padding-left: 24px; list-style-type: decimal; }
 .prose li { margin-bottom: 8px; font-size: 15px; line-height: 1.75; color: var(--text); }
 .prose li::marker { color: var(--text-muted); }
 .prose hr { border: none; height: 1px; background: var(--border); margin: 56px 0; }
