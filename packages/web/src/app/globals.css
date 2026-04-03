@@ -44,6 +44,7 @@
   --card-foreground: #e4e4e7;
   --muted: #18181c;
   --muted-foreground: #71717a;
+  --sidebar: #0c0c10;
   --input: #222228;
   --primary: #f59e0b;
   --primary-foreground: #09090b;
@@ -1716,52 +1717,65 @@ footer a:hover { color: var(--accent); }
 }
 
 /* Code blocks — match article .code-block style */
-.chat-markdown .code-block {
+.chat-markdown [data-streamdown="code-block"] {
   margin: 16px 0 20px !important;
   border-radius: 12px !important;
   border: 1px solid var(--border) !important;
-  overflow: hidden !important;
   background: var(--bg-code) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
 }
 
-.chat-markdown .code-block-header {
+.chat-markdown [data-streamdown="code-block-header"] {
   background: var(--bg-code-header) !important;
   border-bottom: 1px solid var(--border) !important;
-  padding: 8px 16px !important;
-  color: var(--text-muted) !important;
-  font-family: 'JetBrains Mono', monospace !important;
-  font-size: 12px !important;
+  padding: 10px 16px !important;
+  height: auto !important;
 }
 
-.chat-markdown .code-block-body {
+.chat-markdown [data-streamdown="code-block-header"] span {
+  color: var(--text-muted) !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+.chat-markdown [data-streamdown="code-block-body"] {
   background: var(--bg-code) !important;
+  border: none !important;
+  border-radius: 0 !important;
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 13px !important;
   line-height: 1.75 !important;
+  padding: 16px 0 !important;
 }
 
-.chat-markdown .code-block-body pre {
+.chat-markdown [data-streamdown="code-block-body"] pre {
   background: transparent !important;
 }
 
-.chat-markdown .code-block-actions {
+.chat-markdown [data-streamdown="code-block-body"] code {
+  font-family: 'JetBrains Mono', monospace !important;
   background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  color: inherit !important;
+  font-size: inherit !important;
 }
 
-.chat-markdown .code-block-copy-button,
-.chat-markdown .code-block-download-button {
-  background: none !important;
+.chat-markdown [data-streamdown="code-block-actions"] {
+  background: var(--bg-code-header) !important;
   border: 1px solid var(--border) !important;
-  color: var(--text-muted) !important;
-  border-radius: 5px !important;
-  padding: 3px 8px !important;
-  font-size: 11px !important;
-  cursor: pointer;
-  transition: all 0.2s;
+  border-radius: 6px !important;
+  backdrop-filter: none !important;
 }
 
-.chat-markdown .code-block-copy-button:hover,
-.chat-markdown .code-block-download-button:hover {
+.chat-markdown [data-streamdown="code-block-copy-button"],
+.chat-markdown [data-streamdown="code-block-download-button"] {
+  color: var(--text-muted) !important;
+}
+
+.chat-markdown [data-streamdown="code-block-copy-button"]:hover,
+.chat-markdown [data-streamdown="code-block-download-button"]:hover {
   color: var(--text) !important;
-  border-color: var(--border-hover) !important;
 }
