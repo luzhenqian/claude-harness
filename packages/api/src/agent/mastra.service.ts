@@ -8,7 +8,7 @@ import { createSearchFilesTool } from './tools/search-files.tool';
 import { createReadFileTool } from './tools/read-file.mastra';
 import { createSearchArticlesTool } from './tools/search-articles.mastra';
 import { createReadArticleTool } from './tools/read-article.tool';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 export interface MastraStreamEvent {
   type: 'tool_call' | 'tool_result' | 'text_delta' | 'steps' | 'error';
@@ -24,7 +24,9 @@ export class MastraService {
     private readonly llmService: LlmService,
     private readonly searchService: SearchService,
   ) {
-    const projectRoot = join(__dirname, '..', '..', '..', '..');
+    // Use process.cwd() (packages/api) — stable regardless of dist/ vs src/
+    const apiRoot = process.cwd();
+    const projectRoot = join(apiRoot, '..', '..');
     this.sourceRoot = join(projectRoot, 'packages', 'claude-code-source', 'src');
     this.articlesRoot = join(projectRoot, 'content', 'articles');
   }
