@@ -5,8 +5,8 @@ export class AnthropicProvider implements LLMProvider {
   readonly name = 'anthropic';
   private client: Anthropic;
 
-  constructor(apiKey: string, private chatModel: string) {
-    this.client = new Anthropic({ apiKey });
+  constructor(apiKey: string, private chatModel: string, baseUrl?: string) {
+    this.client = new Anthropic({ apiKey, ...(baseUrl ? { baseURL: baseUrl } : {}) });
   }
 
   async *chat(messages: Message[], tools?: ToolDef[]): AsyncIterable<StreamChunk> {

@@ -5,8 +5,8 @@ export class OpenAIProvider implements LLMProvider {
   readonly name = 'openai';
   private client: OpenAI;
 
-  constructor(apiKey: string, private chatModel: string, private embedModel: string) {
-    this.client = new OpenAI({ apiKey });
+  constructor(apiKey: string, private chatModel: string, private embedModel: string, baseUrl?: string) {
+    this.client = new OpenAI({ apiKey, ...(baseUrl ? { baseURL: baseUrl } : {}) });
   }
 
   async *chat(messages: Message[], tools?: ToolDef[]): AsyncIterable<StreamChunk> {

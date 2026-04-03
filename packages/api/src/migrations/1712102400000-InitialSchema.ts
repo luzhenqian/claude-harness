@@ -50,6 +50,7 @@ export class InitialSchema1712102400000 implements MigrationInterface {
         type VARCHAR NOT NULL,
         model VARCHAR NOT NULL,
         api_key VARCHAR NOT NULL,
+        base_url VARCHAR,
         is_default BOOLEAN NOT NULL DEFAULT false,
         config JSONB NOT NULL DEFAULT '{}',
         enabled BOOLEAN NOT NULL DEFAULT true

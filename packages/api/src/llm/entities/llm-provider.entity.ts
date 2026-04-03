@@ -17,6 +17,9 @@ export class LlmProvider {
   @Column({ name: 'api_key' })
   apiKey: string;
 
+  @Column({ name: 'base_url', nullable: true })
+  baseUrl: string;
+
   @Column({ name: 'is_default', default: false })
   isDefault: boolean;
 

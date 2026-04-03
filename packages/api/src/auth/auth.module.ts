@@ -37,7 +37,30 @@ class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, GithubStrategy, GoogleStrategy, JwtStrategy],
+  providers: [AuthService, JwtStrategy],
   exports: [AuthService],
 })
-export class AuthModule {}
+export class AuthModule {
+  static register() {
+    const providers: any[] = [AuthService, JwtStrategy];
+    if (process.env.GITHUB_CLIENT_ID) providers.push(GithubStrategy);
+    if (process.env.GOOGLE_CLIENT_ID) providers.push(GoogleStrategy);
+    return {
+      module: AuthModule,
+      imports: [
+        TypeOrmModule.forFeature([User]),
+        PassportModule,
+        JwtModule.registerAsync({
+          inject: [ConfigService],
+          useFactory: (config: ConfigService) => ({
+            secret: config.get('JWT_SECRET'),
+            signOptions: { expiresIn: '7d' },
+          }),
+        }),
+      ],
+      controllers: [AuthController],
+      providers,
+      exports: [AuthService],
+    };
+  }
+}

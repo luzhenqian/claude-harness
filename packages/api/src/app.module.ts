@@ -26,7 +26,7 @@ import { InitialSchema1712102400000 } from './migrations/1712102400000-InitialSc
         migrations: [InitialSchema1712102400000],
       }),
     }),
-    AuthModule,
+    AuthModule.register(),
     LlmModule,
     AgentModule,
     IndexModule,

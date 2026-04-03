@@ -41,9 +41,9 @@ export class LlmService implements OnModuleInit {
   private createProvider(record: LlmProviderEntity): LLMProvider | null {
     switch (record.name) {
       case 'openai':
-        return new OpenAIProvider(record.apiKey, record.model, record.model);
+        return new OpenAIProvider(record.apiKey, record.model, record.model, record.baseUrl);
       case 'anthropic':
-        return new AnthropicProvider(record.apiKey, record.model);
+        return new AnthropicProvider(record.apiKey, record.model, record.baseUrl);
       case 'gemini':
         return new GeminiProvider(record.apiKey, record.model, record.model);
       default:
