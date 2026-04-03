@@ -1,4 +1,4 @@
-import { Controller, Get, Param, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Query, HttpException, HttpStatus } from '@nestjs/common';
 import { readFile } from 'fs/promises';
 import { join, resolve } from 'path';
 
@@ -12,8 +12,9 @@ export class SourceController {
     this.sourceRoot = join(projectRoot, 'packages', 'claude-code-source', 'src');
   }
 
-  @Get('*filePath')
-  async getSource(@Param('filePath') filePath: string) {
+  @Get()
+  async getSource(@Query('file') filePath: string) {
+    if (!filePath) throw new HttpException('Missing file param', HttpStatus.BAD_REQUEST);
     const fullPath = resolve(join(this.sourceRoot, filePath));
     if (!fullPath.startsWith(resolve(this.sourceRoot))) {
       throw new HttpException('Invalid path', HttpStatus.BAD_REQUEST);

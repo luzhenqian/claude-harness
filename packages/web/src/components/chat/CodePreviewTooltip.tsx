@@ -20,9 +20,8 @@ async function fetchCode(filePath: string): Promise<{ code: string | null; error
   if (cached) return { code: cached.code, error: cached.error || null };
 
   try {
-    const res = await fetch(`${API_BASE}/source/${encodeURIComponent(filePath)}`);
+    const res = await fetch(`${API_BASE}/source?file=${encodeURIComponent(filePath)}`);
     if (!res.ok) {
-      // Fallback: try the server action pattern via a simple GET
       const result = { code: null, error: `File not found: ${filePath}` };
       codeCache.set(filePath, { code: '', error: result.error });
       return result;
@@ -31,7 +30,6 @@ async function fetchCode(filePath: string): Promise<{ code: string | null; error
     codeCache.set(filePath, { code: data.code || '' });
     return { code: data.code, error: null };
   } catch {
-    // Use direct fetch to the source file via the existing code browser pattern
     const result = { code: null, error: `Failed to fetch: ${filePath}` };
     codeCache.set(filePath, { code: '', error: result.error });
     return result;
