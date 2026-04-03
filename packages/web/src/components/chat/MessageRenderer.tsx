@@ -30,12 +30,14 @@ export function MessageRenderer({ content, locale, isStreaming }: Props) {
   const processed = useMemo(() => transformReferences(content, locale), [content, locale]);
 
   return (
-    <Streamdown
-      plugins={{ code, cjk }}
-      isAnimating={isStreaming}
-      mode={isStreaming ? 'streaming' : 'static'}
-    >
-      {processed}
-    </Streamdown>
+    <div className="chat-markdown">
+      <Streamdown
+        plugins={{ code, cjk }}
+        isAnimating={isStreaming}
+        mode={isStreaming ? 'streaming' : 'static'}
+      >
+        {processed}
+      </Streamdown>
+    </div>
   );
 }
