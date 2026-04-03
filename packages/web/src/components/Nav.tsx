@@ -6,6 +6,7 @@ import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LocaleSwitcher } from "./LocaleSwitcher";
 import { t } from "@/lib/ui-translations";
+import { UserMenu } from './UserMenu';
 
 export function Nav() {
   const pathname = usePathname();
@@ -50,6 +51,7 @@ export function Nav() {
           <kbd>⌘K</kbd>
         </div>
         <LocaleSwitcher />
+        <UserMenu locale={locale} />
       </div>
     </nav>
   );
