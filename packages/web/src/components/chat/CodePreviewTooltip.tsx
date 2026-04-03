@@ -255,7 +255,7 @@ export function CodePreviewProvider({ children }: { children: React.ReactNode })
   }, [showTooltip, scheduleHide, clearHideTimeout]);
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       {children}
       {tooltip && createPortal(
         <div
