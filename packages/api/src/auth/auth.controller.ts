@@ -1,10 +1,13 @@
 import { Controller, Get, Post, Req, Res, UseGuards, HttpCode } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Response, Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { User } from './entities/user.entity';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -13,10 +16,12 @@ export class AuthController {
   ) {}
 
   @Get('github')
+  @ApiOperation({ summary: 'Initiate GitHub OAuth login' })
   @UseGuards(AuthGuard('github'))
   githubLogin() {}
 
   @Get('github/callback')
+  @ApiExcludeEndpoint()
   @UseGuards(AuthGuard('github'))
   githubCallback(@Req() req: Request, @Res() res: Response) {
     const token = this.authService.generateToken(req.user as any);
@@ -25,10 +30,12 @@ export class AuthController {
   }
 
   @Get('google')
+  @ApiOperation({ summary: 'Initiate Google OAuth login' })
   @UseGuards(AuthGuard('google'))
   googleLogin() {}
 
   @Get('google/callback')
+  @ApiExcludeEndpoint()
   @UseGuards(AuthGuard('google'))
   googleCallback(@Req() req: Request, @Res() res: Response) {
     const token = this.authService.generateToken(req.user as any);
@@ -37,12 +44,17 @@ export class AuthController {
   }
 
   @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current authenticated user' })
+  @ApiOkResponse({ type: User })
   @UseGuards(JwtAuthGuard)
   getMe(@Req() req: Request) {
     return req.user;
   }
 
   @Post('logout')
+  @ApiOperation({ summary: 'Logout' })
+  @ApiOkResponse({ schema: { properties: { ok: { type: 'boolean' } } } })
   @HttpCode(200)
   logout() {
     return { ok: true };
