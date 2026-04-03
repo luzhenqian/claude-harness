@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import matter from 'gray-matter';
+import * as matter from 'gray-matter';
 
 export interface ArticleChunkData {
   articleSlug: string;
