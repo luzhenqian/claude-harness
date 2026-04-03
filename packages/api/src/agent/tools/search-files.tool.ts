@@ -22,7 +22,9 @@ export function createSearchFilesTool(searchService: {
         score: z.number(),
       })),
     }),
-    execute: async ({ query, limit }: { query: string; limit?: number }) => {
+    execute: async (input: any) => {
+      const query = input.query ?? input.context?.query ?? '';
+      const limit = input.limit ?? input.context?.limit;
       const results = await searchService.searchCode(query, limit || 10);
       if (results.length === 0) return { results: [] };
       return {

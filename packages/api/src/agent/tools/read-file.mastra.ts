@@ -18,7 +18,10 @@ export function createReadFileTool(sourceRoot: string) {
       filePath: z.string(),
       totalLines: z.number(),
     }),
-    execute: async ({ file_path, start_line, end_line }: { file_path: string; start_line?: number; end_line?: number }) => {
+    execute: async (input: any) => {
+      const file_path = input.file_path ?? input.context?.file_path ?? '';
+      const start_line = input.start_line ?? input.context?.start_line;
+      const end_line = input.end_line ?? input.context?.end_line;
       const fullPath = resolve(join(sourceRoot, file_path));
       if (!fullPath.startsWith(resolve(sourceRoot))) {
         return { content: 'Error: invalid file path.', filePath: file_path, totalLines: 0 };
