@@ -1667,6 +1667,31 @@ footer a:hover { color: var(--accent); }
 }
 .chat-markdown a:hover { border-bottom-color: var(--accent); }
 
+/* Source code & article reference badges */
+.chat-markdown a[href*="/code?file="],
+.chat-markdown a[href*="/articles/"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px 2px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(245,158,11,0.2) !important;
+  border-bottom: 1px solid rgba(245,158,11,0.2) !important;
+  background: rgba(245,158,11,0.06);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent) !important;
+  white-space: nowrap;
+  transition: all 0.2s;
+  vertical-align: middle;
+}
+.chat-markdown a[href*="/code?file="]:hover,
+.chat-markdown a[href*="/articles/"]:hover {
+  background: rgba(245,158,11,0.12);
+  border-color: rgba(245,158,11,0.35) !important;
+}
+
 .chat-markdown ul { margin-bottom: 12px; padding-left: 20px; list-style-type: disc; }
 .chat-markdown ol { margin-bottom: 12px; padding-left: 20px; list-style-type: decimal; }
 .chat-markdown li {
