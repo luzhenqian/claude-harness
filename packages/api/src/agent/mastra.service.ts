@@ -39,7 +39,8 @@ export class MastraService {
       apiKey: config.apiKey,
       ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
     });
-    const model = openaiProvider(config.model);
+    // Use .chat() to force Chat Completions API, not Responses API
+    const model = openaiProvider.chat(config.model);
 
     // Create tools
     const tools = {
