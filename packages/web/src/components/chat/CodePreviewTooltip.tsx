@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -89,38 +89,45 @@ function TooltipContent({ filePath, lineRange }: { filePath: string; lineRange?:
 
   return (
     <div>
+      {/* macOS-style header — matches article code blocks */}
       <div style={{
-        padding: '8px 14px',
+        height: 36,
         background: 'var(--bg-code-header)',
         borderBottom: '1px solid var(--border)',
         display: 'flex',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        padding: '0 14px',
+        gap: 10,
       }}>
+        <div style={{ display: 'flex', gap: 5 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', opacity: 0.7 }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#eab308', opacity: 0.7 }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', opacity: 0.7 }} />
+        </div>
         <span style={{
           fontSize: 11,
           fontFamily: "'JetBrains Mono', monospace",
-          color: 'var(--accent)',
-          fontWeight: 500,
+          color: 'var(--text-muted)',
         }}>
-          {filePath}
+          {filePath.split('/').pop()}
         </span>
-        <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
           L{start}-{end} / {totalLines}
         </span>
       </div>
-      <div style={{ maxHeight: 320, overflow: 'auto' }}>
+      {/* Code with syntax highlighting — same style as code browser */}
+      <div style={{ maxHeight: 320, overflow: 'auto', background: 'var(--bg-code)' }}>
         <SyntaxHighlighter
           language={lang}
-          style={oneDark}
+          style={vscDarkPlus}
           showLineNumbers
           startingLineNumber={start}
           customStyle={{
             margin: 0,
-            padding: '12px 0',
+            padding: '14px 0',
             background: 'transparent',
-            fontSize: '12px',
-            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: '13px',
+            fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
             lineHeight: '1.6',
           }}
           lineNumberStyle={{
@@ -230,7 +237,7 @@ export function CodePreviewProvider({ children }: { children: React.ReactNode })
           style={{
             position: 'fixed',
             left: tooltip.x,
-            top: tooltip.y,
+            top: tooltip.y - 10,
             transform: 'translate(-50%, -100%)',
             width: 560,
             maxWidth: 'calc(100vw - 32px)',
@@ -243,13 +250,13 @@ export function CodePreviewProvider({ children }: { children: React.ReactNode })
             animation: 'chat-fade-in 0.15s ease',
           }}
         >
-          {/* Invisible bridge area between link and tooltip */}
+          {/* Invisible bridge area between tooltip and link below */}
           <div style={{
             position: 'absolute',
             left: 0,
             right: 0,
-            bottom: -20,
-            height: 20,
+            bottom: -24,
+            height: 24,
           }} />
           <TooltipContent filePath={tooltip.filePath} lineRange={tooltip.lineRange} />
         </div>,
