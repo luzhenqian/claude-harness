@@ -5,30 +5,15 @@ import {
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChatService } from './chat.service';
-import { AgentService } from '../agent/agent.service';
-import { SearchService } from '../index/search.service';
-import { SearchCodeTool } from '../agent/tools/search-code.tool';
-import { ReadFileTool } from '../agent/tools/read-file.tool';
-import { SearchArticlesTool } from '../agent/tools/search-articles.tool';
-import { GetArticleTool } from '../agent/tools/get-article.tool';
-import { Message as LLMMessage } from '../llm/llm-provider.interface';
-import { join } from 'path';
+import { MastraService } from '../agent/mastra.service';
 
 @Controller('conversations')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
-  private readonly sourceRoot: string;
-  private readonly articlesRoot: string;
-
   constructor(
     private readonly chatService: ChatService,
-    private readonly agentService: AgentService,
-    private readonly searchService: SearchService,
-  ) {
-    const projectRoot = join(__dirname, '..', '..', '..', '..');
-    this.sourceRoot = join(projectRoot, 'packages', 'claude-code-source', 'src');
-    this.articlesRoot = join(projectRoot, 'content', 'articles');
-  }
+    private readonly mastraService: MastraService,
+  ) {}
 
   @Get()
   async list(@Req() req: Request) {
@@ -105,20 +90,11 @@ export class ChatController {
     }
 
     const messages = await this.chatService.getMessages(id);
-    const llmMessages: LLMMessage[] = messages.map((m) => ({
-      role: m.role as any, content: m.content,
-      toolCallId: m.toolName ? m.id : undefined,
-      toolCalls: m.toolCalls as any,
+    const conversationMessages = messages.map((m) => ({
+      role: m.role,
+      content: m.content,
     }));
 
-    const tools = [
-      new SearchCodeTool(this.searchService),
-      new ReadFileTool(this.sourceRoot),
-      new SearchArticlesTool(this.searchService),
-      new GetArticleTool(this.articlesRoot),
-    ];
-
-    // SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -126,13 +102,13 @@ export class ChatController {
 
     let fullResponse = '';
     try {
-      for await (const chunk of this.agentService.run(llmMessages, tools, {
+      for await (const event of this.mastraService.run(conversationMessages, {
         articleSlug: body.context?.articleSlug,
         articleContent: body.context?.articleContent,
         selectedText: body.context?.selectedText,
       })) {
-        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-        if (chunk.type === 'text_delta') fullResponse += chunk.delta;
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+        if (event.type === 'text_delta') fullResponse += event.delta;
       }
 
       await this.chatService.saveMessage(id, 'assistant', fullResponse);
