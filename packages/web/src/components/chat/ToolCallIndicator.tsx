@@ -9,8 +9,8 @@ const TOOL_LABELS: Record<string, string> = {
 
 export function ToolCallIndicator({ toolName, args }: Props) {
   return (
-    <div className="flex items-center gap-2 text-xs text-neutral-400 py-1">
-      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-600 border-t-violet-400" />
+    <div className="flex items-center gap-2 text-xs py-1" style={{ color: 'var(--text-dim)' }}>
+      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2" style={{ borderColor: 'var(--border)', borderTopColor: 'var(--accent)' }} />
       <span>{TOOL_LABELS[toolName] || toolName}{args ? `: ${args}` : ''}...</span>
     </div>
   );

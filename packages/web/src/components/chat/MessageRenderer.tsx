@@ -38,7 +38,7 @@ export function MessageRenderer({ content, locale }: Props) {
 
           if (!match) {
             return (
-              <code className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-violet-300" {...props}>
+              <code className="rounded px-1.5 py-0.5 text-xs" style={{ background: 'var(--bg-code)', color: 'var(--accent)' }} {...props}>
                 {children}
               </code>
             );
@@ -55,7 +55,7 @@ export function MessageRenderer({ content, locale }: Props) {
           return (
             <a href={href} target={href?.startsWith('http') ? '_blank' : undefined}
               rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
-              className="text-violet-400 hover:text-violet-300 underline underline-offset-2">
+              className="underline underline-offset-2" style={{ color: 'var(--accent)' }}>
               {children}
             </a>
           );
