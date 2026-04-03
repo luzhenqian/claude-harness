@@ -68,6 +68,7 @@ export function ChatMessages({ messages, onEditMessage, onSend }: Props) {
           key={msg.id} id={msg.id} role={msg.role} content={msg.content}
           isStreaming={msg.isStreaming}
           onEdit={msg.role === 'user' ? onEditMessage : undefined}
+          thinkingSteps={msg.thinkingSteps}
         />
       ))}
       <div ref={bottomRef} />

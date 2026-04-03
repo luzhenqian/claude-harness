@@ -8,10 +8,10 @@ interface Props { toolName: string; args?: string; }
 export function ToolCallIndicator({ toolName, args }: Props) {
   const locale = useLocale();
   const TOOL_LABELS: Record<string, string> = {
-    search_code: t(locale, 'chat.searchingCode'),
+    search_files: t(locale, 'chat.searchingCode'),
     read_file: t(locale, 'chat.readingFile'),
     search_articles: t(locale, 'chat.searchingArticles'),
-    get_article: t(locale, 'chat.readingArticle'),
+    read_article: t(locale, 'chat.readingArticle'),
   };
   return (
     <div className="flex items-center gap-2 text-xs py-1" style={{ color: 'var(--text-dim)' }}>

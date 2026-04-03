@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { MessageRenderer } from './MessageRenderer';
+import { ThinkingProcess } from './ThinkingProcess';
+import type { ThinkingStep } from './ThinkingProcess';
 import { useLocale } from '@/hooks/useLocale';
 import { t } from '@/lib/ui-translations';
 import { Pencil, Check, Copy, RefreshCw } from 'lucide-react';
@@ -12,9 +14,10 @@ interface Props {
   content: string;
   isStreaming?: boolean;
   onEdit?: (id: string, newContent: string) => void;
+  thinkingSteps?: ThinkingStep[];
 }
 
-export function ChatMessage({ id, role, content, isStreaming, onEdit }: Props) {
+export function ChatMessage({ id, role, content, isStreaming, onEdit, thinkingSteps }: Props) {
   const locale = useLocale();
   const isUser = role === 'user';
   const [hovering, setHovering] = useState(false);
@@ -97,6 +100,11 @@ export function ChatMessage({ id, role, content, isStreaming, onEdit }: Props) {
           {isUser ? '\u4f60' : t(locale, 'chat.title')}
         </span>
       </div>
+
+      {/* Thinking process (assistant only) */}
+      {!isUser && thinkingSteps && thinkingSteps.length > 0 && (
+        <ThinkingProcess steps={thinkingSteps} />
+      )}
 
       {/* Message bubble */}
       {editing ? (
