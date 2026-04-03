@@ -47,17 +47,79 @@ psql -d claude-harness -c "CREATE EXTENSION IF NOT EXISTS vector"
 
 ### Authentication (OAuth)
 
-| Variable | Description | How to Get |
-|----------|-------------|------------|
-| `JWT_SECRET` | Secret for signing JWT tokens | Generate a random string: `openssl rand -hex 32` |
-| `GITHUB_CLIENT_ID` | GitHub OAuth App Client ID | [github.com/settings/developers](https://github.com/settings/developers) > New OAuth App |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth App Secret | Same page as above |
-| `GITHUB_CALLBACK_URL` | GitHub OAuth callback | `http://localhost:3001/auth/github/callback` |
-| `GOOGLE_CLIENT_ID` | Google OAuth Client ID | [console.cloud.google.com](https://console.cloud.google.com/apis/credentials) > Create OAuth client |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth Secret | Same page as above |
-| `GOOGLE_CALLBACK_URL` | Google OAuth callback | `http://localhost:3001/auth/google/callback` |
+| Variable | Description |
+|----------|-------------|
+| `JWT_SECRET` | Secret for signing JWT tokens |
+| `GITHUB_CLIENT_ID` | GitHub OAuth App Client ID |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth App Client Secret |
+| `GITHUB_CALLBACK_URL` | GitHub OAuth callback URL |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
+| `GOOGLE_CALLBACK_URL` | Google OAuth callback URL |
 
 OAuth is optional. If `GITHUB_CLIENT_ID` or `GOOGLE_CLIENT_ID` are not set, the corresponding login strategy is disabled and the server starts without it.
+
+#### JWT Secret
+
+Generate a secure random string:
+
+```bash
+openssl rand -hex 32
+```
+
+Put the result in `.env`:
+```
+JWT_SECRET=your-generated-string
+```
+
+#### GitHub OAuth
+
+1. Go to [github.com/settings/developers](https://github.com/settings/developers)
+2. Click **New OAuth App**
+3. Fill in the form:
+   - **Application name**: `Claude Harness` (or any name)
+   - **Homepage URL**: `http://localhost:3000`
+   - **Authorization callback URL**: `http://localhost:3001/auth/github/callback`
+4. Click **Register application**
+5. Copy **Client ID** → set as `GITHUB_CLIENT_ID`
+6. Click **Generate a new client secret** → copy and set as `GITHUB_CLIENT_SECRET`
+
+```env
+GITHUB_CLIENT_ID=Iv1.xxxxxxxxxxxxxxxx
+GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GITHUB_CALLBACK_URL=http://localhost:3001/auth/github/callback
+```
+
+> For production, replace `localhost` URLs with your actual domain.
+
+#### Google OAuth
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project (or select an existing one)
+3. Navigate to **APIs & Services** > **Credentials**
+4. Click **Configure consent screen**:
+   - Choose **External** user type
+   - Fill in **App name**, **User support email**, **Developer contact email**
+   - Add scopes: `email`, `profile`
+   - Add your email to **Test users** (required while in testing mode)
+   - Click **Save and Continue** through remaining steps
+5. Go back to **Credentials** > **Create Credentials** > **OAuth client ID**
+6. Choose **Web application** as the application type
+7. Fill in:
+   - **Name**: `Claude Harness`
+   - **Authorized JavaScript origins**: `http://localhost:3000`
+   - **Authorized redirect URIs**: `http://localhost:3001/auth/google/callback`
+8. Click **Create**
+9. Copy **Client ID** → set as `GOOGLE_CLIENT_ID`
+10. Copy **Client secret** → set as `GOOGLE_CLIENT_SECRET`
+
+```env
+GOOGLE_CLIENT_ID=xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GOOGLE_CALLBACK_URL=http://localhost:3001/auth/google/callback
+```
+
+> Google OAuth requires the consent screen to be configured. While the app is in "Testing" mode, only users listed in the test users list can log in. To allow anyone, submit for verification or switch to "Internal" (Google Workspace only).
 
 ### Frontend
 
