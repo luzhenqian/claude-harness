@@ -3,6 +3,8 @@ import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import { Nav, Footer } from "@/components/Nav";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -26,10 +28,13 @@ export default async function LocaleLayout({ children, params }: Props) {
     <html lang={locale}>
       <body>
         <NextIntlClientProvider messages={messages}>
-          <div className="grid-bg"></div>
-          <Nav />
-          {children}
-          <Footer />
+          <AuthProvider>
+            <div className="grid-bg"></div>
+            <Nav />
+            {children}
+            <Footer />
+            <ChatWidget />
+          </AuthProvider>
         </NextIntlClientProvider>
       </body>
     </html>
