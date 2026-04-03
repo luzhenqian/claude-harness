@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { t } from '@/lib/ui-translations';
+import { Search, Code, BookOpen, MessageSquare } from 'lucide-react';
 
 interface Props {
   x: number;
@@ -18,9 +19,9 @@ export function ContextMenu({ x, y, selectedText, onAction, onClose }: Props) {
   const [customPrompt, setCustomPrompt] = useState('');
 
   const actions = [
-    { id: 'explain', icon: '🔍', label: t(locale, 'chat.explain') },
-    { id: 'find_code', icon: '📄', label: t(locale, 'chat.findCode') },
-    { id: 'find_articles', icon: '📚', label: t(locale, 'chat.findArticles') },
+    { id: 'explain', icon: <Search size={14} />, label: t(locale, 'chat.explain') },
+    { id: 'find_code', icon: <Code size={14} />, label: t(locale, 'chat.findCode') },
+    { id: 'find_articles', icon: <BookOpen size={14} />, label: t(locale, 'chat.findArticles') },
   ];
 
   return (
@@ -34,11 +35,12 @@ export function ContextMenu({ x, y, selectedText, onAction, onClose }: Props) {
       onMouseDown={(e) => e.stopPropagation()}>
       {actions.map((action) => (
         <button key={action.id} onClick={() => { onAction(action.id); onClose(); }}
-          className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+          className="w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-colors"
           style={{ color: 'var(--text)' }}
           onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-dim)'}
           onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-          <span>{action.icon}</span><span>{action.label}</span>
+          <span style={{ color: 'var(--text-muted)' }}>{action.icon}</span>
+          <span>{action.label}</span>
         </button>
       ))}
       <div style={{ borderTop: '1px solid var(--border)', marginTop: '4px', paddingTop: '4px' }}>
@@ -48,7 +50,10 @@ export function ContextMenu({ x, y, selectedText, onAction, onClose }: Props) {
             style={{ color: 'var(--text-dim)' }}
             onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-dim)'}
             onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-            <span className="flex items-center gap-2"><span>✏️</span><span>{t(locale, 'chat.customQuestion')}</span></span>
+            <span className="flex items-center gap-2.5">
+              <MessageSquare size={14} style={{ color: 'var(--text-muted)' }} />
+              <span>{t(locale, 'chat.customQuestion')}</span>
+            </span>
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>⌘K</span>
           </button>
         ) : (

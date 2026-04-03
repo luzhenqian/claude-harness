@@ -85,27 +85,34 @@ export default function ArticleShell({ locale, title, description, order, totalA
     const widget = getChatWidgetHandle();
     if (!widget) return;
 
-    let message = '';
-    switch (action) {
-      case 'explain':
-        message = `Please explain the following text:\n\n"${selection.text}"`;
-        break;
-      case 'find_code':
-        message = `Find source code related to:\n\n"${selection.text}"`;
-        break;
-      case 'find_articles':
-        message = `Find articles related to:\n\n"${selection.text}"`;
-        break;
-      case 'custom':
-        message = `About the following text: "${selection.text}"\n\n${customPrompt}`;
-        break;
-      default:
-        message = `${selection.text}`;
-    }
+    const prompts: Record<string, Record<string, string>> = {
+      explain: {
+        zh: `请解释以下内容：\n\n"${selection.text}"`,
+        en: `Please explain the following text:\n\n"${selection.text}"`,
+        ja: `以下のテキストを説明してください：\n\n「${selection.text}」`,
+      },
+      find_code: {
+        zh: `查找与以下内容相关的源代码：\n\n"${selection.text}"`,
+        en: `Find source code related to:\n\n"${selection.text}"`,
+        ja: `以下に関連するソースコードを検索：\n\n「${selection.text}」`,
+      },
+      find_articles: {
+        zh: `查找与以下内容相关的文章：\n\n"${selection.text}"`,
+        en: `Find articles related to:\n\n"${selection.text}"`,
+        ja: `以下に関連する記事を検索：\n\n「${selection.text}」`,
+      },
+      custom: {
+        zh: `关于以下文字："${selection.text}"\n\n${customPrompt}`,
+        en: `About the following text: "${selection.text}"\n\n${customPrompt}`,
+        ja: `以下のテキストについて：「${selection.text}」\n\n${customPrompt}`,
+      },
+    };
 
-    widget.open(message, { selectedText: selection.text });
+    const message = prompts[action]?.[locale] || prompts[action]?.en || selection.text;
+
+    widget.open(message, { selectedText: selection.text, newConversation: true });
     clearSelection();
-  }, [selection, clearSelection]);
+  }, [selection, clearSelection, locale]);
 
   // Keep refs in sync with state
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);

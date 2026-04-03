@@ -38,11 +38,22 @@ export function ChatPanel({ onClose, articleSlug, articleContent, pendingMessage
 
   // Handle pending messages from context menu
   useEffect(() => {
-    if (pendingMessage && activeConversationId && !isStreaming) {
-      sendMessage(pendingMessage.content, { articleSlug, articleContent, ...pendingMessage.context });
+    if (!pendingMessage || isStreaming) return;
+
+    const send = async () => {
+      if (pendingMessage.context?.newConversation) {
+        // Create a fresh conversation for each context menu action
+        await createConversation(articleSlug);
+      }
+      // Wait for activeConversationId to be set
+      sendMessage(pendingMessage.content, { articleSlug, articleContent, selectedText: pendingMessage.context?.selectedText });
       onPendingConsumed?.();
+    };
+
+    if (activeConversationId || pendingMessage.context?.newConversation) {
+      send();
     }
-  }, [pendingMessage, activeConversationId, isStreaming, sendMessage, articleSlug, articleContent, onPendingConsumed]);
+  }, [pendingMessage, activeConversationId, isStreaming, sendMessage, createConversation, articleSlug, articleContent, onPendingConsumed]);
 
   const headerStyle: React.CSSProperties = {
     display: 'flex',

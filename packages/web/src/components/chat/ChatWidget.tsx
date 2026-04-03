@@ -9,7 +9,7 @@ import { t } from '@/lib/ui-translations';
 interface Props { articleSlug?: string; articleContent?: string; }
 
 export interface ChatWidgetHandle {
-  open: (message?: string, context?: { selectedText?: string; articleSlug?: string; articleContent?: string }) => void;
+  open: (message?: string, context?: { selectedText?: string; articleSlug?: string; articleContent?: string; newConversation?: boolean }) => void;
 }
 
 let widgetHandle: ChatWidgetHandle | null = null;
