@@ -169,10 +169,8 @@ export function ChatMessage({ id, role, content, isStreaming, onEdit }: Props) {
         }}>
           {isUser ? (
             <div style={{ whiteSpace: 'pre-wrap' }}>{content}</div>
-          ) : isStreaming ? (
-            <div className="whitespace-pre-wrap streaming-cursor">{content}</div>
           ) : (
-            <MessageRenderer content={content} />
+            <MessageRenderer content={content} isStreaming={isStreaming} />
           )}
           {isStreaming && !content && (
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
