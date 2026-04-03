@@ -70,6 +70,7 @@ export function useChat() {
     if (!convId) {
       convId = await createConversation(context?.articleSlug);
     }
+    if (!convId) return;
 
     const userMsg: ChatMessage = { id: `temp-${Date.now()}`, role: 'user', content };
     setMessages((prev) => [...prev, userMsg]);
