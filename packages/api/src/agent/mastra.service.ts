@@ -107,13 +107,13 @@ export class MastraService {
         yield { type: 'steps', steps };
       }
 
-      // Extract token usage from the stream result
+      // Extract token usage from the stream result (AI SDK exposes inputTokens/outputTokens)
       const usage = await (result as any).usage;
       yield {
         type: 'done',
         usage: {
-          inputTokens: usage?.promptTokens ?? 0,
-          outputTokens: usage?.completionTokens ?? 0,
+          inputTokens: usage?.inputTokens ?? usage?.promptTokens ?? 0,
+          outputTokens: usage?.outputTokens ?? usage?.completionTokens ?? 0,
         },
       };
     } catch (error) {
