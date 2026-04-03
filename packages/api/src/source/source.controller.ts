@@ -12,7 +12,7 @@ export class SourceController {
     this.sourceRoot = join(projectRoot, 'packages', 'claude-code-source', 'src');
   }
 
-  @Get(':filePath(*)')
+  @Get('*filePath')
   async getSource(@Param('filePath') filePath: string) {
     const fullPath = resolve(join(this.sourceRoot, filePath));
     if (!fullPath.startsWith(resolve(this.sourceRoot))) {
