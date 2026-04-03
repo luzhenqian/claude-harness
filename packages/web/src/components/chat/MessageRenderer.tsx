@@ -14,7 +14,9 @@ interface Props {
 function transformReferences(content: string, locale: string = 'en'): string {
   let result = content.replace(
     /\[source:([^\]]+?)(?:#L(\d+)(?:-L(\d+))?)?\]/g,
-    (_, filePath, startLine, endLine) => {
+    (_, rawPath, startLine, endLine) => {
+      // Strip leading "src/" if present — paths should be relative to source root
+      const filePath = rawPath.replace(/^src\//, '');
       const lineRange = startLine ? (endLine ? `#L${startLine}-L${endLine}` : `#L${startLine}`) : '';
       return `[📄 \`${filePath}${lineRange}\`](/${locale}/code?file=${encodeURIComponent(filePath)}${lineRange})`;
     },

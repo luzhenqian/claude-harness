@@ -140,7 +140,9 @@ function FileNode({
 
 export default function CodeBrowserClient({ tree }: { tree: TreeNode[] }) {
   const searchParams = useSearchParams();
-  const initialPath = searchParams.get("file") || searchParams.get("path") || "";
+  const rawPath = searchParams.get("file") || searchParams.get("path") || "";
+  // Strip leading "src/" if present — tree paths don't include it
+  const initialPath = rawPath.replace(/^src\//, '');
 
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(null);
