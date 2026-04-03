@@ -90,7 +90,12 @@ export class CodeIndexerService {
     if (chunk.metadata.params) parts.push(`Parameters: ${(chunk.metadata.params as string[]).join(', ')}`);
     if (chunk.metadata.returnType) parts.push(`Returns: ${chunk.metadata.returnType}`);
     if (chunk.metadata.jsdoc) parts.push(`Description: ${chunk.metadata.jsdoc}`);
-    parts.push('', chunk.content);
+    // Truncate content to ~6000 chars to stay within embedding model token limit (8192)
+    const maxContentChars = 6000;
+    const content = chunk.content.length > maxContentChars
+      ? chunk.content.slice(0, maxContentChars) + '\n// ... truncated'
+      : chunk.content;
+    parts.push('', content);
     return parts.join('\n');
   }
 }

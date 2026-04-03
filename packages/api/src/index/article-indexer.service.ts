@@ -60,7 +60,11 @@ export class ArticleIndexerService {
   buildDescriptionText(chunk: ArticleChunkData): string {
     const parts = [`Article: ${chunk.metadata.title || chunk.articleSlug}`, `Section: ${chunk.heading}`];
     if (chunk.metadata.tags) parts.push(`Tags: ${(chunk.metadata.tags as string[]).join(', ')}`);
-    parts.push('', chunk.content);
+    const maxContentChars = 6000;
+    const content = chunk.content.length > maxContentChars
+      ? chunk.content.slice(0, maxContentChars) + '\n... truncated'
+      : chunk.content;
+    parts.push('', content);
     return parts.join('\n');
   }
 }
