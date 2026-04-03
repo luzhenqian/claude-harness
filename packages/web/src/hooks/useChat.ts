@@ -32,6 +32,7 @@ export function useChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const [currentToolCall, setCurrentToolCall] = useState<{ name: string; args?: any } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadConversations = useCallback(async () => {
     const convs = await api.listConversations();
@@ -84,6 +85,25 @@ export function useChat() {
 
     try {
       const response = await api.sendMessage(convId, content, context, { skipUserMessage: options?.skipUserMessage });
+
+      if (response.status === 429) {
+        const body = await response.json();
+        const resetsAt = body.details?.resetsAt;
+        const resetTime = resetsAt ? new Date(resetsAt).toLocaleTimeString() : '';
+        setError(
+          `Daily token limit reached. Quota resets at ${resetTime} UTC.`
+        );
+        // Remove the optimistic assistant message
+        setMessages((prev) => prev.filter((m) => m.id !== assistantMsg.id));
+        return;
+      }
+
+      if (!response.ok) {
+        setError(`Error: ${response.status} ${response.statusText}`);
+        setMessages((prev) => prev.filter((m) => m.id !== assistantMsg.id));
+        return;
+      }
+
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       if (!reader) return;
@@ -142,6 +162,7 @@ export function useChat() {
     content: string,
     context?: { articleSlug?: string; selectedText?: string; articleContent?: string },
   ) => {
+    setError(null);
     let convId = activeConversationId;
     if (!convId) {
       convId = await createConversation(context?.articleSlug);
@@ -160,6 +181,7 @@ export function useChat() {
     newContent: string,
     context?: { articleSlug?: string; selectedText?: string; articleContent?: string },
   ) => {
+    setError(null);
     if (!activeConversationId) return;
 
     // Update the message content and delete everything after it
@@ -191,9 +213,9 @@ export function useChat() {
   }, [loadConversations]);
 
   return {
-    conversations, activeConversationId, messages, isStreaming, currentToolCall,
+    conversations, activeConversationId, messages, isStreaming, currentToolCall, error,
     loadConversations, selectConversation, createConversation,
     findOrCreateSession, sendMessage, editMessage, stopStreaming,
-    deleteConversation, renameConversation,
+    deleteConversation, renameConversation, clearError: () => setError(null),
   };
 }
