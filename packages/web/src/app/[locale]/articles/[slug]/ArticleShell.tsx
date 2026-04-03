@@ -3,6 +3,9 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { t, getTagLabel, formatTemplate } from "@/lib/ui-translations";
+import { useTextSelection } from '@/hooks/useTextSelection';
+import { ContextMenu } from '@/components/chat/ContextMenu';
+import { getChatWidgetHandle } from '@/components/chat/ChatWidget';
 
 interface ArticleShellProps {
   locale: string;
@@ -74,6 +77,35 @@ export default function ArticleShell({ locale, title, description, order, totalA
   const activeIdRef = useRef('');
   const isClickScrolling = useRef(false);
   const headingsRef = useRef<Heading[]>([]);
+
+  const { selection, clearSelection } = useTextSelection(contentRef);
+
+  const handleContextAction = useCallback((action: string, customPrompt?: string) => {
+    if (!selection) return;
+    const widget = getChatWidgetHandle();
+    if (!widget) return;
+
+    let message = '';
+    switch (action) {
+      case 'explain':
+        message = `Please explain the following text:\n\n"${selection.text}"`;
+        break;
+      case 'find_code':
+        message = `Find source code related to:\n\n"${selection.text}"`;
+        break;
+      case 'find_articles':
+        message = `Find articles related to:\n\n"${selection.text}"`;
+        break;
+      case 'custom':
+        message = `About the following text: "${selection.text}"\n\n${customPrompt}`;
+        break;
+      default:
+        message = `${selection.text}`;
+    }
+
+    widget.open(message, { selectedText: selection.text });
+    clearSelection();
+  }, [selection, clearSelection]);
 
   // Keep refs in sync with state
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
@@ -269,6 +301,15 @@ export default function ArticleShell({ locale, title, description, order, totalA
           </div>
         </aside>
       </div>
+      {selection && (
+        <ContextMenu
+          x={selection.x}
+          y={selection.y}
+          selectedText={selection.text}
+          onAction={handleContextAction}
+          onClose={clearSelection}
+        />
+      )}
     </div>
   );
 }
