@@ -9,7 +9,10 @@
     "start:prod": "node dist/main",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "migration:generate": "pnpm typeorm migration:generate -d src/config/database.config.ts",
-    "migration:run": "pnpm typeorm migration:run -d src/config/database.config.ts"
+    "migration:run": "pnpm typeorm migration:run -d src/config/database.config.ts",
+    "index:all": "ts-node -r tsconfig-paths/register src/index/cli/index.command.ts all",
+    "index:code": "ts-node -r tsconfig-paths/register src/index/cli/index.command.ts code",
+    "index:articles": "ts-node -r tsconfig-paths/register src/index/cli/index.command.ts articles"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
@@ -23,6 +26,7 @@
     "@nestjs/typeorm": "^11.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
+    "glob": "^13.0.6",
     "gray-matter": "^4.0.3",
     "openai": "^6.33.0",
     "passport": "^0.7.0",
@@ -41,6 +45,7 @@
     "@nestjs/testing": "^11.0.0",
     "@swc/core": "^1.15.21",
     "@types/express": "^5.0.6",
+    "@types/glob": "^9.0.0",
     "@types/node": "^22.0.0",
     "@types/passport-github2": "^1.2.9",
     "@types/passport-google-oauth20": "^2.0.16",
