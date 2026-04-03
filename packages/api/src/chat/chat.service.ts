@@ -50,4 +50,24 @@ export class ChatService {
   async getMessages(conversationId: string): Promise<Message[]> {
     return this.msgRepo.find({ where: { conversationId }, order: { createdAt: 'ASC' } });
   }
+
+  async updateMessage(conversationId: string, messageId: string, content: string): Promise<Message | null> {
+    const msg = await this.msgRepo.findOne({ where: { id: messageId, conversationId } });
+    if (!msg) return null;
+    msg.content = content;
+    return this.msgRepo.save(msg);
+  }
+
+  async deleteMessagesAfter(conversationId: string, messageId: string): Promise<number> {
+    const msg = await this.msgRepo.findOne({ where: { id: messageId, conversationId } });
+    if (!msg) return 0;
+    const result = await this.msgRepo
+      .createQueryBuilder()
+      .delete()
+      .from(Message)
+      .where('conversation_id = :conversationId', { conversationId })
+      .andWhere('created_at > :createdAt', { createdAt: msg.createdAt })
+      .execute();
+    return result.affected || 0;
+  }
 }

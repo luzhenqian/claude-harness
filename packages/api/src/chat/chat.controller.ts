@@ -66,6 +66,30 @@ export class ChatController {
     return this.chatService.getMessages(id);
   }
 
+  @Patch(':id/messages/:msgId')
+  async updateMessage(
+    @Req() req: Request, @Param('id') id: string, @Param('msgId') msgId: string,
+    @Body() body: { content: string },
+  ) {
+    const user = req.user as { id: string };
+    const conv = await this.chatService.getConversation(id, user.id);
+    if (!conv) throw new HttpException('Not found', HttpStatus.NOT_FOUND);
+    const msg = await this.chatService.updateMessage(id, msgId, body.content);
+    if (!msg) throw new HttpException('Message not found', HttpStatus.NOT_FOUND);
+    return msg;
+  }
+
+  @Delete(':id/messages/:msgId/after')
+  async deleteMessagesAfter(
+    @Req() req: Request, @Param('id') id: string, @Param('msgId') msgId: string,
+  ) {
+    const user = req.user as { id: string };
+    const conv = await this.chatService.getConversation(id, user.id);
+    if (!conv) throw new HttpException('Not found', HttpStatus.NOT_FOUND);
+    const count = await this.chatService.deleteMessagesAfter(id, msgId);
+    return { deleted: count };
+  }
+
   @Post(':id/messages')
   async sendMessage(
     @Req() req: Request, @Res() res: Response,
