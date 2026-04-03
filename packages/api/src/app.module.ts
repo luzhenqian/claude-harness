@@ -15,6 +15,9 @@ import { LlmProvider } from './llm/entities/llm-provider.entity';
 import { CodeChunk } from './index/entities/code-chunk.entity';
 import { ArticleChunk } from './index/entities/article-chunk.entity';
 import { InitialSchema1712102400000 } from './migrations/1712102400000-InitialSchema';
+import { AddTokenQuota1743724800000 } from './migrations/1743724800000-AddTokenQuota';
+import { TokenUsage } from './quota/entities/token-usage.entity';
+import { SystemConfig } from './quota/entities/system-config.entity';
 
 @Module({
   imports: [
@@ -23,8 +26,8 @@ import { InitialSchema1712102400000 } from './migrations/1712102400000-InitialSc
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         ...getDatabaseConfig(configService),
-        entities: [User, Conversation, Message, LlmProvider, CodeChunk, ArticleChunk],
-        migrations: [InitialSchema1712102400000],
+        entities: [User, Conversation, Message, LlmProvider, CodeChunk, ArticleChunk, TokenUsage, SystemConfig],
+        migrations: [InitialSchema1712102400000, AddTokenQuota1743724800000],
       }),
     }),
     AuthModule.register(),
