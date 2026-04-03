@@ -27,33 +27,39 @@ export function ChatPanel({ onClose, articleSlug, articleContent, pendingMessage
   } = useChat();
   const locale = useLocale();
   const initialized = useRef(false);
+  const pendingHandled = useRef(false);
   const [expanded, setExpanded] = useState(false);
 
-  // Auto-find or create session on mount
+  // Auto-find or create session on mount (skip if we have a pending new conversation)
   useEffect(() => {
     if (!user || initialized.current) return;
     initialized.current = true;
+    // If there's a pending message requesting new conversation, skip loading old session
+    if (pendingMessage?.context?.newConversation) return;
     findOrCreateSession(articleSlug);
-  }, [user, articleSlug, findOrCreateSession]);
+  }, [user, articleSlug, findOrCreateSession, pendingMessage]);
 
   // Handle pending messages from context menu
   useEffect(() => {
-    if (!pendingMessage || isStreaming) return;
+    if (!pendingMessage || pendingHandled.current || isStreaming) return;
+    // Mark as handled immediately to prevent double execution
+    pendingHandled.current = true;
 
     const send = async () => {
       if (pendingMessage.context?.newConversation) {
-        // Create a fresh conversation for each context menu action
         await createConversation(articleSlug);
       }
-      // Wait for activeConversationId to be set
       sendMessage(pendingMessage.content, { articleSlug, articleContent, selectedText: pendingMessage.context?.selectedText });
       onPendingConsumed?.();
     };
 
-    if (activeConversationId || pendingMessage.context?.newConversation) {
-      send();
-    }
-  }, [pendingMessage, activeConversationId, isStreaming, sendMessage, createConversation, articleSlug, articleContent, onPendingConsumed]);
+    send();
+  }, [pendingMessage, isStreaming]); // minimal deps — ref guards against re-runs
+
+  // Reset guard when pendingMessage is consumed
+  useEffect(() => {
+    if (!pendingMessage) pendingHandled.current = false;
+  }, [pendingMessage]);
 
   const headerStyle: React.CSSProperties = {
     display: 'flex',
