@@ -63,7 +63,11 @@ export function useChat() {
   }, [createConversation]);
 
   // Stream a response from the backend, appending chunks to a streaming assistant message
-  const streamResponse = useCallback(async (convId: string, content: string, context?: { articleSlug?: string; selectedText?: string; articleContent?: string }) => {
+  const streamResponse = useCallback(async (
+    convId: string, content: string,
+    context?: { articleSlug?: string; selectedText?: string; articleContent?: string },
+    options?: { skipUserMessage?: boolean },
+  ) => {
     const assistantMsg: ChatMessage = { id: `stream-${Date.now()}`, role: 'assistant', content: '', isStreaming: true };
     setMessages((prev) => [...prev, assistantMsg]);
 
@@ -71,7 +75,7 @@ export function useChat() {
     abortRef.current = new AbortController();
 
     try {
-      const response = await api.sendMessage(convId, content, context);
+      const response = await api.sendMessage(convId, content, context, { skipUserMessage: options?.skipUserMessage });
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       if (!reader) return;
@@ -105,7 +109,9 @@ export function useChat() {
       }
     } finally {
       setIsStreaming(false);
-      setMessages((prev) => prev.map((m) => ({ ...m, isStreaming: false })));
+      // Reload messages from backend to sync real IDs (replace temp-xxx with UUIDs)
+      const realMsgs = await api.getMessages(convId);
+      setMessages(realMsgs);
       loadConversations();
     }
   }, [loadConversations]);
@@ -134,15 +140,16 @@ export function useChat() {
   ) => {
     if (!activeConversationId) return;
 
+    // Update the message content and delete everything after it
     await api.updateMessage(activeConversationId, messageId, newContent);
     await api.deleteMessagesAfter(activeConversationId, messageId);
 
-    // Reload to get clean state (edited message is already saved)
+    // Reload to get clean state (only the edited user message remains)
     const msgs = await api.getMessages(activeConversationId);
     setMessages(msgs);
 
-    // Stream response without creating a new user message
-    await streamResponse(activeConversationId, newContent, context);
+    // Stream response — skip creating a new user message since we already have the edited one
+    await streamResponse(activeConversationId, newContent, context, { skipUserMessage: true });
   }, [activeConversationId, streamResponse]);
 
   const stopStreaming = useCallback(() => { abortRef.current?.abort(); }, []);

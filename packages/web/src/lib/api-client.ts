@@ -34,7 +34,8 @@ export const api = {
     apiFetch<any[]>(`/conversations/${conversationId}/messages`),
 
   sendMessage: (conversationId: string, content: string,
-    context?: { articleSlug?: string; selectedText?: string; articleContent?: string }) => {
+    context?: { articleSlug?: string; selectedText?: string; articleContent?: string },
+    options?: { skipUserMessage?: boolean }) => {
     const token = getToken();
     return fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
       method: 'POST',
@@ -42,7 +43,7 @@ export const api = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ content, context }),
+      body: JSON.stringify({ content, context, skipUserMessage: options?.skipUserMessage }),
     });
   },
 

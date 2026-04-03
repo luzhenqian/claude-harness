@@ -94,13 +94,15 @@ export class ChatController {
   async sendMessage(
     @Req() req: Request, @Res() res: Response,
     @Param('id') id: string,
-    @Body() body: { content: string; context?: { articleSlug?: string; selectedText?: string; articleContent?: string } },
+    @Body() body: { content: string; context?: { articleSlug?: string; selectedText?: string; articleContent?: string }; skipUserMessage?: boolean },
   ) {
     const user = req.user as { id: string };
     const conv = await this.chatService.getConversation(id, user.id);
     if (!conv) throw new HttpException('Not found', HttpStatus.NOT_FOUND);
 
-    await this.chatService.saveMessage(id, 'user', body.content, { context: body.context });
+    if (!body.skipUserMessage) {
+      await this.chatService.saveMessage(id, 'user', body.content, { context: body.context });
+    }
 
     const messages = await this.chatService.getMessages(id);
     const llmMessages: LLMMessage[] = messages.map((m) => ({
