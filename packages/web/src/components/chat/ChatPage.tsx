@@ -41,7 +41,7 @@ export function ChatPage() {
   }
 
   return (
-    <div className="flex" style={{ height: 'calc(100vh - 56px)', paddingTop: '56px' }}>
+    <div className="flex" style={{ height: '100vh', paddingTop: '56px' }}>
       <ChatSidebar
         conversations={conversations}
         activeId={activeConversationId}
@@ -56,10 +56,10 @@ export function ChatPage() {
           <>
             <div className="flex-1 flex justify-center overflow-y-auto">
               <div className="w-full max-w-3xl">
-                <ChatMessages messages={messages} onEditMessage={(id, content) => editMessage(id, content)} />
+                <ChatMessages messages={messages} onEditMessage={(id, content) => editMessage(id, content)} onSend={(content) => sendMessage(content)} />
               </div>
             </div>
-            <div className="flex justify-center" style={{ borderTop: '1px solid var(--border)' }}>
+            <div className="flex justify-center">
               <div className="w-full max-w-3xl">
                 <ChatInput onSend={(content) => sendMessage(content)} disabled={isStreaming} />
               </div>

@@ -62,7 +62,8 @@ export function Footer() {
 
   const segments = pathname.split('/').filter(Boolean);
   const isArticleDetail = segments.length >= 3 && segments[1] === 'articles';
-  if (isArticleDetail) return null;
+  const isChatPage = segments.length >= 2 && segments[1] === 'chat';
+  if (isArticleDetail || isChatPage) return null;
 
   const locale = segments[0] || 'en';
 

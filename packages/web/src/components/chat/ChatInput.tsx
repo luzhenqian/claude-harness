@@ -56,6 +56,7 @@ export function ChatInput({ onSend, disabled }: Props) {
             transition: 'border-color 0.2s, box-shadow 0.2s',
             minHeight: 44,
             maxHeight: 160,
+            overflow: 'hidden',
             opacity: disabled ? 0.5 : 1,
           }}
           onFocus={(e) => {
@@ -96,7 +97,7 @@ export function ChatInput({ onSend, disabled }: Props) {
         textAlign: 'center',
         fontFamily: "'JetBrains Mono', monospace",
       }}>
-        Enter {t(locale, 'chat.send')} \u00b7 Shift + Enter {locale === 'zh' ? '\u6362\u884c' : locale === 'ja' ? '\u6539\u884c' : 'new line'}
+        Enter {t(locale, 'chat.send')} · Shift + Enter {locale === 'zh' ? '换行' : locale === 'ja' ? '改行' : 'new line'}
       </div>
     </div>
   );

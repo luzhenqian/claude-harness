@@ -143,7 +143,7 @@ export function ChatPanel({ onClose, articleSlug, articleContent, pendingMessage
           </button>
         </div>
       </div>
-      <ChatMessages messages={messages} onEditMessage={(id, content) => editMessage(id, content, { articleSlug, articleContent })} />
+      <ChatMessages messages={messages} onEditMessage={(id, content) => editMessage(id, content, { articleSlug, articleContent })} onSend={(content) => sendMessage(content, { articleSlug, articleContent })} />
       <ChatInput onSend={(content) => sendMessage(content, { articleSlug, articleContent })} disabled={isStreaming} />
     </div>
   );
