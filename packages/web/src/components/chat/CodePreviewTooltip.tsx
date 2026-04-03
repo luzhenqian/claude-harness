@@ -47,7 +47,7 @@ function detectLanguage(filePath: string): string {
   return map[ext] ?? 'typescript';
 }
 
-const CHUNK_SIZE = 25;
+const CHUNK_SIZE = 100;
 
 function TooltipContent({ filePath, lineRange }: { filePath: string; lineRange?: { start: number; end: number } }) {
   const [code, setCode] = useState<string | null>(null);
