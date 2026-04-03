@@ -15,6 +15,7 @@
     "index:articles": "ts-node -r tsconfig-paths/register src/index/cli/index.command.ts articles"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.50",
     "@anthropic-ai/sdk": "^0.82.0",
     "@google/generative-ai": "^0.24.1",
     "@mastra/core": "^1.21.0",
