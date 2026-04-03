@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { ChatPanel } from './ChatPanel';
 import { useLocale } from '@/hooks/useLocale';
 import { t } from '@/lib/ui-translations';
@@ -16,7 +17,12 @@ export function getChatWidgetHandle() { return widgetHandle; }
 
 export function ChatWidget({ articleSlug, articleContent }: Props) {
   const locale = useLocale();
+  const pathname = usePathname();
+  const isChatPage = pathname.split('/').filter(Boolean)[1] === 'chat';
   const [isOpen, setIsOpen] = useState(false);
+
+  // Don't render on the standalone chat page
+  if (isChatPage) return null;
   const [pendingMessage, setPendingMessage] = useState<{ content: string; context?: any } | null>(null);
 
   const open = useCallback((message?: string, context?: any) => {
