@@ -3,12 +3,19 @@
 import { useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/api-client';
 
+export interface ThinkingStep {
+  tool: string;
+  args: any;
+  resultPreview: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'tool';
   content: string;
   toolCalls?: any[];
   isStreaming?: boolean;
+  thinkingSteps?: ThinkingStep[];
 }
 
 export interface Conversation {
@@ -24,6 +31,7 @@ export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const [currentToolCall, setCurrentToolCall] = useState<{ name: string; args?: any } | null>(null);
 
   const loadConversations = useCallback(async () => {
     const convs = await api.listConversations();
@@ -93,13 +101,26 @@ export function useChat() {
           const data = line.slice(6).trim();
           if (data === '[DONE]') break;
           try {
-            const chunk = JSON.parse(data);
-            if (chunk.type === 'text_delta') {
+            const event = JSON.parse(data);
+            if (event.type === 'text_delta') {
               setMessages((prev) => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
                 if (last.isStreaming) {
-                  updated[updated.length - 1] = { ...last, content: last.content + chunk.delta };
+                  updated[updated.length - 1] = { ...last, content: last.content + event.delta };
+                }
+                return updated;
+              });
+            } else if (event.type === 'tool_call') {
+              setCurrentToolCall({ name: event.name, args: event.args });
+            } else if (event.type === 'tool_result') {
+              setCurrentToolCall(null);
+            } else if (event.type === 'steps') {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last.isStreaming) {
+                  updated[updated.length - 1] = { ...last, thinkingSteps: event.steps };
                 }
                 return updated;
               });
@@ -108,6 +129,7 @@ export function useChat() {
         }
       }
     } finally {
+      setCurrentToolCall(null);
       setIsStreaming(false);
       // Reload messages from backend to sync real IDs (replace temp-xxx with UUIDs)
       const realMsgs = await api.getMessages(convId);
@@ -169,7 +191,7 @@ export function useChat() {
   }, [loadConversations]);
 
   return {
-    conversations, activeConversationId, messages, isStreaming,
+    conversations, activeConversationId, messages, isStreaming, currentToolCall,
     loadConversations, selectConversation, createConversation,
     findOrCreateSession, sendMessage, editMessage, stopStreaming,
     deleteConversation, renameConversation,
