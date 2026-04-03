@@ -1714,3 +1714,54 @@ footer a:hover { color: var(--accent); }
   border-bottom: 1px solid rgba(255,255,255,0.03);
   color: var(--text);
 }
+
+/* Code blocks — match article .code-block style */
+.chat-markdown .code-block {
+  margin: 16px 0 20px !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--border) !important;
+  overflow: hidden !important;
+  background: var(--bg-code) !important;
+}
+
+.chat-markdown .code-block-header {
+  background: var(--bg-code-header) !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: 8px 16px !important;
+  color: var(--text-muted) !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 12px !important;
+}
+
+.chat-markdown .code-block-body {
+  background: var(--bg-code) !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 13px !important;
+  line-height: 1.75 !important;
+}
+
+.chat-markdown .code-block-body pre {
+  background: transparent !important;
+}
+
+.chat-markdown .code-block-actions {
+  background: transparent !important;
+}
+
+.chat-markdown .code-block-copy-button,
+.chat-markdown .code-block-download-button {
+  background: none !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-muted) !important;
+  border-radius: 5px !important;
+  padding: 3px 8px !important;
+  font-size: 11px !important;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chat-markdown .code-block-copy-button:hover,
+.chat-markdown .code-block-download-button:hover {
+  color: var(--text) !important;
+  border-color: var(--border-hover) !important;
+}
