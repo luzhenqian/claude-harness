@@ -48,12 +48,14 @@ export class SearchService {
         FROM code_chunks WHERE tsv @@ plainto_tsquery('english', $3)
         ORDER BY text_score DESC LIMIT $2
       )
-      SELECT DISTINCT ON (id) id, file_path, chunk_type, name, content, start_line, end_line, metadata,
+      SELECT DISTINCT ON (combined.id)
+        combined.id, combined.file_path, combined.chunk_type, combined.name,
+        combined.content, combined.start_line, combined.end_line, combined.metadata,
         COALESCE(v.vec_score, 0) * 0.7 + COALESCE(t.text_score, 0) * 0.3 AS score
       FROM (SELECT * FROM vector_results UNION ALL SELECT * FROM text_results) combined
-      LEFT JOIN vector_results v USING (id)
-      LEFT JOIN text_results t USING (id)
-      ORDER BY score DESC LIMIT $2
+      LEFT JOIN vector_results v ON v.id = combined.id
+      LEFT JOIN text_results t ON t.id = combined.id
+      ORDER BY combined.id, score DESC
     `;
 
     const rows = await this.dataSource.query(sql, [embeddingStr, limit, query]);
@@ -81,12 +83,14 @@ export class SearchService {
         FROM article_chunks WHERE tsv @@ plainto_tsquery('english', $3) AND locale = $4
         ORDER BY text_score DESC LIMIT $2
       )
-      SELECT DISTINCT ON (id) id, article_slug, locale, heading, content, metadata,
+      SELECT DISTINCT ON (combined.id)
+        combined.id, combined.article_slug, combined.locale, combined.heading,
+        combined.content, combined.metadata,
         COALESCE(v.vec_score, 0) * 0.7 + COALESCE(t.text_score, 0) * 0.3 AS score
       FROM (SELECT * FROM vector_results UNION ALL SELECT * FROM text_results) combined
-      LEFT JOIN vector_results v USING (id)
-      LEFT JOIN text_results t USING (id)
-      ORDER BY score DESC LIMIT $2
+      LEFT JOIN vector_results v ON v.id = combined.id
+      LEFT JOIN text_results t ON t.id = combined.id
+      ORDER BY combined.id, score DESC
     `;
 
     const rows = await this.dataSource.query(sql, [embeddingStr, limit, query, locale]);
