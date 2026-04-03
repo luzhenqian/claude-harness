@@ -25,7 +25,7 @@ export class IndexService {
   ) {}
 
   async indexCode(sourceRoot: string, force: boolean = false): Promise<{ processed: number; skipped: number }> {
-    const files = await glob('**/*.ts', { cwd: sourceRoot });
+    const files = await glob('**/*.{ts,tsx}', { cwd: sourceRoot });
     let processed = 0, skipped = 0;
 
     for (const filePath of files) {
