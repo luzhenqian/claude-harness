@@ -35,7 +35,7 @@ export function MessageRenderer({ content, locale, isStreaming }: Props) {
         plugins={{ code, cjk }}
         isAnimating={isStreaming}
         mode={isStreaming ? 'streaming' : 'static'}
-        linkSafety={false}
+        linkSafety={{ enabled: false }}
       >
         {processed}
       </Streamdown>

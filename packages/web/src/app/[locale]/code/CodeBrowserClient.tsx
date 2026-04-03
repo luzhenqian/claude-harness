@@ -140,7 +140,7 @@ function FileNode({
 
 export default function CodeBrowserClient({ tree }: { tree: TreeNode[] }) {
   const searchParams = useSearchParams();
-  const initialPath = searchParams.get("path") || "";
+  const initialPath = searchParams.get("file") || searchParams.get("path") || "";
 
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(null);
@@ -152,8 +152,6 @@ export default function CodeBrowserClient({ tree }: { tree: TreeNode[] }) {
   const expandedPaths = useMemo(() => {
     const paths = new Set<string>();
     if (initialPath) {
-      // Expand all ancestor paths: "utils" → expand "utils"
-      // "services/api" → expand "services" and "services/api"
       const parts = initialPath.split("/");
       let current = "";
       for (const part of parts) {
@@ -163,6 +161,13 @@ export default function CodeBrowserClient({ tree }: { tree: TreeNode[] }) {
     }
     return paths;
   }, [initialPath]);
+
+  // Auto-select file from URL query param
+  useEffect(() => {
+    if (initialPath && !selectedPath) {
+      handleSelect(initialPath);
+    }
+  }, [initialPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredTree = useMemo(
     () => filterTree(tree, searchQuery),
