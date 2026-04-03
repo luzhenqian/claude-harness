@@ -6,6 +6,8 @@ import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChatService } from './chat.service';
 import { MastraService } from '../agent/mastra.service';
+import { TokenQuotaGuard } from '../quota/guards/token-quota.guard';
+import { TokenUsageService } from '../quota/token-usage.service';
 
 @Controller('conversations')
 @UseGuards(JwtAuthGuard)
@@ -13,6 +15,7 @@ export class ChatController {
   constructor(
     private readonly chatService: ChatService,
     private readonly mastraService: MastraService,
+    private readonly tokenUsageService: TokenUsageService,
   ) {}
 
   @Get()
@@ -76,6 +79,7 @@ export class ChatController {
   }
 
   @Post(':id/messages')
+  @UseGuards(TokenQuotaGuard)
   async sendMessage(
     @Req() req: Request, @Res() res: Response,
     @Param('id') id: string,
@@ -101,17 +105,32 @@ export class ChatController {
     res.flushHeaders();
 
     let fullResponse = '';
+    let tokenUsage = { inputTokens: 0, outputTokens: 0 };
     try {
       for await (const event of this.mastraService.run(conversationMessages, {
         articleSlug: body.context?.articleSlug,
         articleContent: body.context?.articleContent,
         selectedText: body.context?.selectedText,
       })) {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
+        if (event.type === 'done') {
+          tokenUsage = event.usage;
+        } else {
+          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        }
         if (event.type === 'text_delta') fullResponse += event.delta;
       }
 
       await this.chatService.saveMessage(id, 'assistant', fullResponse);
+
+      // Record token usage
+      await this.tokenUsageService.record({
+        userId: user.id,
+        conversationId: id,
+        inputTokens: tokenUsage.inputTokens,
+        outputTokens: tokenUsage.outputTokens,
+        provider: 'default',
+        model: 'default',
+      });
 
       if (messages.length <= 1 && !conv.title) {
         const title = body.content.slice(0, 50) + (body.content.length > 50 ? '...' : '');

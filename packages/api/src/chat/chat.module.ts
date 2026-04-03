@@ -6,9 +6,10 @@ import { ChatService } from './chat.service';
 import { ChatController } from './chat.controller';
 import { AgentModule } from '../agent/agent.module';
 import { IndexModule } from '../index/index.module';
+import { QuotaModule } from '../quota/quota.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Conversation, Message]), AgentModule, IndexModule],
+  imports: [TypeOrmModule.forFeature([Conversation, Message]), AgentModule, IndexModule, QuotaModule],
   controllers: [ChatController],
   providers: [ChatService],
 })
