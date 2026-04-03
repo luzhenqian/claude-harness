@@ -161,6 +161,10 @@ const translations: Record<string, Record<string, string>> = {
     'user.signIn': '登录',
     'user.chatHistory': '对话历史',
     'user.logout': '退出登录',
+    'user.loginTitle': '登录 Claude Harness',
+    'user.loginDesc': '选择一种方式登录，开始探索 Claude Code 的源码和架构。',
+    'user.continueWith': '使用 {provider} 登录',
+    'user.terms': '登录即表示你同意我们的服务条款和隐私政策。',
   },
   en: {
     'nav.articles': 'Articles',
@@ -314,6 +318,10 @@ const translations: Record<string, Record<string, string>> = {
     'user.signIn': 'Sign in',
     'user.chatHistory': 'Chat History',
     'user.logout': 'Sign out',
+    'user.loginTitle': 'Sign in to Claude Harness',
+    'user.loginDesc': 'Choose a sign-in method to start exploring Claude Code\'s source and architecture.',
+    'user.continueWith': 'Continue with {provider}',
+    'user.terms': 'By signing in, you agree to our Terms of Service and Privacy Policy.',
   },
   ja: {
     'nav.articles': '記事',
@@ -467,6 +475,10 @@ const translations: Record<string, Record<string, string>> = {
     'user.signIn': 'ログイン',
     'user.chatHistory': '会話履歴',
     'user.logout': 'ログアウト',
+    'user.loginTitle': 'Claude Harness にログイン',
+    'user.loginDesc': 'ログイン方法を選択して、Claude Code のソースとアーキテクチャの探索を始めましょう。',
+    'user.continueWith': '{provider} で続行',
+    'user.terms': 'ログインすることで、利用規約とプライバシーポリシーに同意したことになります。',
   },
 };
 

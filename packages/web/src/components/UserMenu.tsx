@@ -30,10 +30,10 @@ export function UserMenu({ locale }: Props) {
 
   if (!user) {
     return (
-      <a href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/github`}
+      <Link href={`/${locale}/auth/login`}
         className="nav-btn" style={{ fontSize: '13px' }}>
         {t(locale, 'user.signIn')}
-      </a>
+      </Link>
     );
   }
 
