@@ -26,24 +26,78 @@ export function ChatInput({ onSend, disabled }: Props) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
+  const hasInput = input.trim().length > 0;
+
   return (
-    <div className="flex items-end gap-2 p-3" style={{ borderTop: '1px solid var(--border)' }}>
-      <textarea
-        ref={textareaRef} value={input}
-        onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
-        onKeyDown={handleKeyDown} placeholder={t(locale, 'chat.placeholder')} disabled={disabled} rows={1}
-        className="flex-1 resize-none rounded-lg px-3 py-2 text-sm placeholder:opacity-40 focus:outline-none disabled:opacity-50"
-        style={{ border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', caretColor: 'var(--accent)' }}
-        onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
-        onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
-      />
-      <button onClick={handleSend} disabled={disabled || !input.trim()}
-        className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        style={{ background: 'var(--accent)' }}
-        onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-        onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>
-        {t(locale, 'chat.send')}
-      </button>
+    <div style={{ padding: '16px', borderTop: '1px solid #1a1a22' }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+        <textarea
+          ref={textareaRef} value={input}
+          onChange={(e) => {
+            setInput(e.target.value);
+            e.target.style.height = 'auto';
+            e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder={t(locale, 'chat.placeholder')}
+          disabled={disabled} rows={1}
+          style={{
+            flex: 1,
+            padding: '12px 16px',
+            borderRadius: 12,
+            border: '1px solid var(--border)',
+            background: 'var(--bg)',
+            color: 'var(--text)',
+            fontSize: 14,
+            lineHeight: 1.6,
+            fontFamily: "'Noto Sans SC', sans-serif",
+            resize: 'none',
+            outline: 'none',
+            transition: 'border-color 0.2s, box-shadow 0.2s',
+            minHeight: 44,
+            maxHeight: 160,
+            opacity: disabled ? 0.5 : 1,
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = 'rgba(245,158,11,0.3)';
+            e.target.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.06)';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'var(--border)';
+            e.target.style.boxShadow = 'none';
+          }}
+        />
+        <button onClick={handleSend} disabled={disabled || !hasInput}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 10,
+            border: 'none',
+            background: hasInput && !disabled
+              ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+              : 'rgba(255,255,255,0.04)',
+            color: hasInput && !disabled ? '#09090b' : 'var(--text-muted)',
+            cursor: hasInput && !disabled ? 'pointer' : 'default',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+            flexShrink: 0,
+          }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4 20-7z"/>
+          </svg>
+        </button>
+      </div>
+      <div style={{
+        fontSize: 11,
+        color: 'var(--text-muted)',
+        marginTop: 8,
+        textAlign: 'center',
+        fontFamily: "'JetBrains Mono', monospace",
+      }}>
+        Enter {t(locale, 'chat.send')} \u00b7 Shift + Enter {locale === 'zh' ? '\u6362\u884c' : locale === 'ja' ? '\u6539\u884c' : 'new line'}
+      </div>
     </div>
   );
 }

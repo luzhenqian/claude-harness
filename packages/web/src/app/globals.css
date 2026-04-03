@@ -1557,7 +1557,7 @@ footer a:hover { color: var(--accent); }
 }
 .reveal.visible { opacity: 1; transform: translateY(0); }
 
-/* ===== STREAMING CURSOR ===== */
+/* ===== CHAT ANIMATIONS ===== */
 @keyframes cursor-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
@@ -1568,4 +1568,50 @@ footer a:hover { color: var(--accent); }
   color: var(--accent);
   animation: cursor-blink 0.6s step-end infinite;
   margin-left: 1px;
+}
+
+@keyframes chat-msg-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes chat-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes chat-typing-dot {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+@keyframes chat-bubble-in {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes chat-window-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ===== CHAT ACTION BUTTONS ===== */
+.chat-action-btn {
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  transition: all 0.15s;
+}
+
+.chat-action-btn:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: var(--border);
+  color: var(--text-dim);
 }

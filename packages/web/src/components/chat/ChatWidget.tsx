@@ -30,8 +30,27 @@ export function ChatWidget({ articleSlug, articleContent }: Props) {
     <>
       {!isOpen && (
         <button onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg flex items-center justify-center text-white text-xl hover:scale-105 transition-transform"
-          style={{ background: 'linear-gradient(135deg, var(--accent), #d97706)', boxShadow: '0 4px 24px var(--accent-glow)' }}
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 50,
+            width: 56,
+            height: 56,
+            borderRadius: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05))',
+            border: '1px solid rgba(245,158,11,0.25)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(245,158,11,0.1)',
+            color: 'var(--accent)',
+            cursor: 'pointer',
+            transition: 'transform 0.2s',
+            animation: 'chat-bubble-in 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
           aria-label={t(locale, 'chat.openChat')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -39,7 +58,18 @@ export function ChatWidget({ articleSlug, articleContent }: Props) {
         </button>
       )}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[480px] h-[600px]">
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 50,
+          width: 480,
+          height: 600,
+          borderRadius: 16,
+          overflow: 'hidden',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03)',
+          animation: 'chat-window-in 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}>
           <ChatPanel
             onClose={() => { setIsOpen(false); setPendingMessage(null); }}
             articleSlug={articleSlug} articleContent={articleContent}

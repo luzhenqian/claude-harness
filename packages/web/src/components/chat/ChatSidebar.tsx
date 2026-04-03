@@ -46,13 +46,13 @@ export function ChatSidebar({ conversations, activeId, onSelect, onNew, onRename
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ width: '280px', borderRight: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+    <div className="flex flex-col h-full" style={{ width: '280px', borderRight: '1px solid #1a1a22', background: '#0a0a0d' }}>
       <div className="p-3">
         <button onClick={onNew}
           className="w-full flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
-          style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid rgba(245,158,11,0.2)' }}
+          style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.02))', color: 'var(--accent)', border: '1px solid rgba(245,158,11,0.2)' }}
           onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(245,158,11,0.2)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'var(--accent-dim)'}>
+          onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.02))'}>
           <Plus size={16} />
           {t(locale, 'chat.newConversation')}
         </button>
@@ -90,13 +90,14 @@ export function ChatSidebar({ conversations, activeId, onSelect, onNew, onRename
                 </div>
               ) : deletingId === conv.id ? (
                 <div className="flex-1 flex items-center justify-between">
-                  <span className="text-xs" style={{ color: 'var(--red)' }}>{t(locale, 'chat.delete')}</span>
-                  <div className="flex gap-1">
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(conv.id); setDeletingId(null); }}
-                      className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--red)' }}>{t(locale, 'chat.yes')}</button>
-                    <button onClick={(e) => { e.stopPropagation(); setDeletingId(null); }}
-                      className="text-xs px-2 py-0.5 rounded" style={{ color: 'var(--text-muted)' }}>{t(locale, 'chat.no')}</button>
-                  </div>
+                  <span className="text-xs truncate" style={{ color: 'var(--text-dim)' }}>
+                    {conv.title || t(locale, 'chat.untitled')}
+                  </span>
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(conv.id); setDeletingId(null); }}
+                    className="text-xs px-3 py-1 rounded-md ml-2 flex-shrink-0"
+                    style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.25)', cursor: 'pointer' }}>
+                    {locale === 'zh' ? '\u786e\u8ba4' : locale === 'ja' ? '\u78ba\u8a8d' : 'Confirm'}
+                  </button>
                 </div>
               ) : (
                 <>
@@ -129,6 +130,29 @@ export function ChatSidebar({ conversations, activeId, onSelect, onNew, onRename
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Sidebar footer */}
+      <div style={{
+        padding: '12px 16px',
+        borderTop: '1px solid #1a1a22',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+      }}>
+        <div style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: 'var(--accent)',
+          boxShadow: '0 0 6px rgba(245,158,11,0.3)',
+        }} />
+        <span style={{
+          fontSize: 10,
+          fontFamily: "'JetBrains Mono', monospace",
+          color: 'var(--text-muted)',
+          letterSpacing: '0.02em',
+        }}>
+          Claude Code
+        </span>
       </div>
     </div>
   );
