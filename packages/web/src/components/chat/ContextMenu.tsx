@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useLocale } from '@/hooks/useLocale';
+import { t } from '@/lib/ui-translations';
 
 interface Props {
   x: number;
@@ -11,13 +13,14 @@ interface Props {
 }
 
 export function ContextMenu({ x, y, selectedText, onAction, onClose }: Props) {
+  const locale = useLocale();
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
 
   const actions = [
-    { id: 'explain', icon: '🔍', label: 'Explain this' },
-    { id: 'find_code', icon: '📄', label: 'Find related source code' },
-    { id: 'find_articles', icon: '📚', label: 'Find related articles' },
+    { id: 'explain', icon: '🔍', label: t(locale, 'chat.explain') },
+    { id: 'find_code', icon: '📄', label: t(locale, 'chat.findCode') },
+    { id: 'find_articles', icon: '📚', label: t(locale, 'chat.findArticles') },
   ];
 
   return (
@@ -44,7 +47,7 @@ export function ContextMenu({ x, y, selectedText, onAction, onClose }: Props) {
             style={{ color: 'var(--text-dim)' }}
             onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-dim)'}
             onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-            <span className="flex items-center gap-2"><span>✏️</span><span>Custom question...</span></span>
+            <span className="flex items-center gap-2"><span>✏️</span><span>{t(locale, 'chat.customQuestion')}</span></span>
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>⌘K</span>
           </button>
         ) : (
@@ -55,7 +58,7 @@ export function ContextMenu({ x, y, selectedText, onAction, onClose }: Props) {
                 if (e.key === 'Enter' && customPrompt.trim()) { onAction('custom', customPrompt.trim()); onClose(); }
                 if (e.key === 'Escape') onClose();
               }}
-              placeholder="Type your question..."
+              placeholder={t(locale, 'chat.typePlaceholder')}
               className="w-full rounded px-3 py-1.5 text-sm focus:outline-none"
               style={{
                 background: 'var(--bg)', border: '1px solid var(--border)',

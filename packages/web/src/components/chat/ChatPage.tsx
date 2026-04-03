@@ -8,9 +8,12 @@ import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { LoginButton } from '@/components/auth/LoginButton';
 import { MessageSquare } from 'lucide-react';
+import { useLocale } from '@/hooks/useLocale';
+import { t } from '@/lib/ui-translations';
 
 export function ChatPage() {
   const { user } = useAuthContext();
+  const locale = useLocale();
   const {
     conversations, activeConversationId, messages, isStreaming,
     loadConversations, selectConversation, createConversation,
@@ -29,8 +32,8 @@ export function ChatPage() {
       <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 56px)', paddingTop: '56px' }}>
         <div className="text-center">
           <MessageSquare size={48} style={{ color: 'var(--text-muted)', margin: '0 auto 16px' }} />
-          <h2 className="text-xl font-medium mb-2" style={{ color: 'var(--text)' }}>AI Assistant</h2>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>Sign in to access your conversations</p>
+          <h2 className="text-xl font-medium mb-2" style={{ color: 'var(--text)' }}>{t(locale, 'chat.title')}</h2>
+          <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>{t(locale, 'chat.signInAccess')}</p>
           <LoginButton />
         </div>
       </div>
@@ -67,13 +70,13 @@ export function ChatPage() {
             <div className="text-center max-w-md">
               <MessageSquare size={40} style={{ color: 'var(--text-muted)', margin: '0 auto 12px' }} />
               <h3 className="text-lg font-medium mb-2" style={{ color: 'var(--text)' }}>
-                Ask about Claude Code
+                {t(locale, 'chat.askAbout')}
               </h3>
               <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>
-                Select a conversation from the sidebar or start a new one.
+                {t(locale, 'chat.selectOrNew')}
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
-                {['How does the agent loop work?', 'Explain the permission system', 'What tools are available?'].map((q) => (
+                {[t(locale, 'chat.quickQ1'), t(locale, 'chat.quickQ2'), t(locale, 'chat.quickQ3')].map((q) => (
                   <button key={q}
                     onClick={async () => {
                       const id = await createConversation();

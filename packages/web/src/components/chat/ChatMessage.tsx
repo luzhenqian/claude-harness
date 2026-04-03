@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { MessageRenderer } from './MessageRenderer';
 import { Pencil } from 'lucide-react';
+import { useLocale } from '@/hooks/useLocale';
+import { t } from '@/lib/ui-translations';
 
 interface Props {
   id: string;
@@ -13,6 +15,7 @@ interface Props {
 }
 
 export function ChatMessage({ id, role, content, isStreaming, onEdit }: Props) {
+  const locale = useLocale();
   const isUser = role === 'user';
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(content);
@@ -50,9 +53,9 @@ export function ChatMessage({ id, role, content, isStreaming, onEdit }: Props) {
             />
             <div className="flex justify-end gap-2 mt-2">
               <button onClick={() => { setEditing(false); setEditValue(content); }}
-                className="text-xs px-2 py-1 rounded" style={{ color: 'var(--text-dim)' }}>Cancel</button>
+                className="text-xs px-2 py-1 rounded" style={{ color: 'var(--text-dim)' }}>{t(locale, 'chat.cancel')}</button>
               <button onClick={handleConfirmEdit}
-                className="text-xs px-2 py-1 rounded text-white" style={{ background: 'var(--accent)' }}>Save & Resend</button>
+                className="text-xs px-2 py-1 rounded text-white" style={{ background: 'var(--accent)' }}>{t(locale, 'chat.saveResend')}</button>
             </div>
           </div>
         ) : (

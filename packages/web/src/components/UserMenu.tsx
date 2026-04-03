@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { LogOut, MessageSquare, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
+import { t } from '@/lib/ui-translations';
 
 interface Props { locale: string; }
 
@@ -31,7 +32,7 @@ export function UserMenu({ locale }: Props) {
     return (
       <a href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/github`}
         className="nav-btn" style={{ fontSize: '13px' }}>
-        Sign in
+        {t(locale, 'user.signIn')}
       </a>
     );
   }
@@ -76,7 +77,7 @@ export function UserMenu({ locale }: Props) {
             onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-dim)'}
             onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
             <MessageSquare size={14} />
-            对话历史
+            {t(locale, 'user.chatHistory')}
           </Link>
 
           <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
@@ -87,7 +88,7 @@ export function UserMenu({ locale }: Props) {
             onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
             onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
             <LogOut size={14} />
-            退出登录
+            {t(locale, 'user.logout')}
           </button>
         </div>
       )}

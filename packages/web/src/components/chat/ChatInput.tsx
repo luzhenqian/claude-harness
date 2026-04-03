@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, KeyboardEvent } from 'react';
+import { useLocale } from '@/hooks/useLocale';
+import { t } from '@/lib/ui-translations';
 
 interface Props {
   onSend: (content: string) => void;
@@ -8,6 +10,7 @@ interface Props {
 }
 
 export function ChatInput({ onSend, disabled }: Props) {
+  const locale = useLocale();
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -28,7 +31,7 @@ export function ChatInput({ onSend, disabled }: Props) {
       <textarea
         ref={textareaRef} value={input}
         onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
-        onKeyDown={handleKeyDown} placeholder="Ask about Claude Code..." disabled={disabled} rows={1}
+        onKeyDown={handleKeyDown} placeholder={t(locale, 'chat.placeholder')} disabled={disabled} rows={1}
         className="flex-1 resize-none rounded-lg px-3 py-2 text-sm placeholder:opacity-40 focus:outline-none disabled:opacity-50"
         style={{ border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', caretColor: 'var(--accent)' }}
         onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
@@ -39,7 +42,7 @@ export function ChatInput({ onSend, disabled }: Props) {
         style={{ background: 'var(--accent)' }}
         onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
         onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>
-        Send
+        {t(locale, 'chat.send')}
       </button>
     </div>
   );

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import type { Conversation } from '@/hooks/useChat';
+import { useLocale } from '@/hooks/useLocale';
+import { t, formatTemplate } from '@/lib/ui-translations';
 
 interface Props {
   conversations: Conversation[];
@@ -14,6 +16,7 @@ interface Props {
 }
 
 export function ChatSidebar({ conversations, activeId, onSelect, onNew, onRename, onDelete }: Props) {
+  const locale = useLocale();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -33,12 +36,12 @@ export function ChatSidebar({ conversations, activeId, onSelect, onNew, onRename
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
     const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return 'Just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffMin < 1) return t(locale, 'chat.justNow');
+    if (diffMin < 60) return formatTemplate(t(locale, 'chat.minutesAgo'), { n: diffMin });
     const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffHr < 24) return formatTemplate(t(locale, 'chat.hoursAgo'), { n: diffHr });
     const diffDay = Math.floor(diffHr / 24);
-    if (diffDay < 7) return `${diffDay}d ago`;
+    if (diffDay < 7) return formatTemplate(t(locale, 'chat.daysAgo'), { n: diffDay });
     return d.toLocaleDateString();
   };
 
@@ -51,7 +54,7 @@ export function ChatSidebar({ conversations, activeId, onSelect, onNew, onRename
           onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(245,158,11,0.2)'}
           onMouseLeave={(e) => e.currentTarget.style.background = 'var(--accent-dim)'}>
           <Plus size={16} />
-          新建对话
+          {t(locale, 'chat.newConversation')}
         </button>
       </div>
 
@@ -87,19 +90,19 @@ export function ChatSidebar({ conversations, activeId, onSelect, onNew, onRename
                 </div>
               ) : deletingId === conv.id ? (
                 <div className="flex-1 flex items-center justify-between">
-                  <span className="text-xs" style={{ color: 'var(--red)' }}>Delete?</span>
+                  <span className="text-xs" style={{ color: 'var(--red)' }}>{t(locale, 'chat.delete')}</span>
                   <div className="flex gap-1">
                     <button onClick={(e) => { e.stopPropagation(); onDelete(conv.id); setDeletingId(null); }}
-                      className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--red)' }}>Yes</button>
+                      className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--red)' }}>{t(locale, 'chat.yes')}</button>
                     <button onClick={(e) => { e.stopPropagation(); setDeletingId(null); }}
-                      className="text-xs px-2 py-0.5 rounded" style={{ color: 'var(--text-muted)' }}>No</button>
+                      className="text-xs px-2 py-0.5 rounded" style={{ color: 'var(--text-muted)' }}>{t(locale, 'chat.no')}</button>
                   </div>
                 </div>
               ) : (
                 <>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm truncate" style={{ color: conv.id === activeId ? 'var(--text-bright)' : 'var(--text)' }}>
-                      {conv.title || '未命名对话'}
+                      {conv.title || t(locale, 'chat.untitled')}
                     </div>
                     <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                       {formatTime(conv.updatedAt)}

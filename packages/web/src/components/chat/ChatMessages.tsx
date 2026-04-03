@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { ChatMessage as ChatMessageComponent } from './ChatMessage';
 import type { ChatMessage } from '@/hooks/useChat';
+import { useLocale } from '@/hooks/useLocale';
+import { t } from '@/lib/ui-translations';
 
 interface Props {
   messages: ChatMessage[];
@@ -10,13 +12,14 @@ interface Props {
 }
 
 export function ChatMessages({ messages, onEditMessage }: Props) {
+  const locale = useLocale();
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-sm" style={{ color: 'var(--text-dim)' }}>
-        Ask me anything about Claude Code's source code and architecture.
+        {t(locale, 'chat.emptyState')}
       </div>
     );
   }
