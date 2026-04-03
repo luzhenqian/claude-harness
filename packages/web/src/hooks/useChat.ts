@@ -62,19 +62,8 @@ export function useChat() {
     return createConversation(articleSlug);
   }, [createConversation]);
 
-  const sendMessage = useCallback(async (
-    content: string,
-    context?: { articleSlug?: string; selectedText?: string; articleContent?: string },
-  ) => {
-    let convId = activeConversationId;
-    if (!convId) {
-      convId = await createConversation(context?.articleSlug);
-    }
-    if (!convId) return;
-
-    const userMsg: ChatMessage = { id: `temp-${Date.now()}`, role: 'user', content };
-    setMessages((prev) => [...prev, userMsg]);
-
+  // Stream a response from the backend, appending chunks to a streaming assistant message
+  const streamResponse = useCallback(async (convId: string, content: string, context?: { articleSlug?: string; selectedText?: string; articleContent?: string }) => {
     const assistantMsg: ChatMessage = { id: `stream-${Date.now()}`, role: 'assistant', content: '', isStreaming: true };
     setMessages((prev) => [...prev, assistantMsg]);
 
@@ -119,8 +108,25 @@ export function useChat() {
       setMessages((prev) => prev.map((m) => ({ ...m, isStreaming: false })));
       loadConversations();
     }
-  }, [activeConversationId, createConversation, loadConversations]);
+  }, [loadConversations]);
 
+  const sendMessage = useCallback(async (
+    content: string,
+    context?: { articleSlug?: string; selectedText?: string; articleContent?: string },
+  ) => {
+    let convId = activeConversationId;
+    if (!convId) {
+      convId = await createConversation(context?.articleSlug);
+    }
+    if (!convId) return;
+
+    const userMsg: ChatMessage = { id: `temp-${Date.now()}`, role: 'user', content };
+    setMessages((prev) => [...prev, userMsg]);
+
+    await streamResponse(convId, content, context);
+  }, [activeConversationId, createConversation, streamResponse]);
+
+  // Edit a user message: update content, delete subsequent messages, regenerate response
   const editMessage = useCallback(async (
     messageId: string,
     newContent: string,
@@ -131,11 +137,13 @@ export function useChat() {
     await api.updateMessage(activeConversationId, messageId, newContent);
     await api.deleteMessagesAfter(activeConversationId, messageId);
 
+    // Reload to get clean state (edited message is already saved)
     const msgs = await api.getMessages(activeConversationId);
     setMessages(msgs);
 
-    await sendMessage(newContent, context);
-  }, [activeConversationId, sendMessage]);
+    // Stream response without creating a new user message
+    await streamResponse(activeConversationId, newContent, context);
+  }, [activeConversationId, streamResponse]);
 
   const stopStreaming = useCallback(() => { abortRef.current?.abort(); }, []);
 
