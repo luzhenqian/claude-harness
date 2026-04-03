@@ -7,6 +7,7 @@ import { LlmModule } from './llm/llm.module';
 import { AgentModule } from './agent/agent.module';
 import { IndexModule } from './index/index.module';
 import { ChatModule } from './chat/chat.module';
+import { SourceModule } from './source/source.module';
 import { User } from './auth/entities/user.entity';
 import { Conversation } from './chat/entities/conversation.entity';
 import { Message } from './chat/entities/message.entity';
@@ -31,6 +32,7 @@ import { InitialSchema1712102400000 } from './migrations/1712102400000-InitialSc
     AgentModule,
     IndexModule,
     ChatModule,
+    SourceModule,
   ],
 })
 export class AppModule {}
