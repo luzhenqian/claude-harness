@@ -25,6 +25,7 @@ export function ContextMenu({ x, y, selectedText, onAction, onClose }: Props) {
 
   return (
     <div
+      data-context-menu
       className="fixed z-[60] min-w-[220px] rounded-lg shadow-xl py-1 animate-in fade-in duration-150"
       style={{
         left: x, top: y, transform: 'translate(-50%, -100%)',

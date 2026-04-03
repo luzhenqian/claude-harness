@@ -23,14 +23,21 @@ export function useTextSelection(containerRef: React.RefObject<HTMLElement | nul
 
   const clearSelection = useCallback(() => { setSelection(null); }, []);
 
+  const handleMouseDown = useCallback((e: MouseEvent) => {
+    // Don't clear selection if clicking inside the context menu
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-context-menu]')) return;
+    clearSelection();
+  }, [clearSelection]);
+
   useEffect(() => {
     document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('mousedown', clearSelection);
+    document.addEventListener('mousedown', handleMouseDown);
     return () => {
       document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('mousedown', clearSelection);
+      document.removeEventListener('mousedown', handleMouseDown);
     };
-  }, [handleMouseUp, clearSelection]);
+  }, [handleMouseUp, handleMouseDown]);
 
   return { selection, clearSelection };
 }
