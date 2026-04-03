@@ -44,11 +44,32 @@ export function useChat() {
     return conv.id;
   }, [loadConversations]);
 
+  const findOrCreateSession = useCallback(async (articleSlug?: string) => {
+    const convs = await api.listConversations();
+    setConversations(convs);
+
+    const match = articleSlug
+      ? convs.find((c: Conversation) => c.articleSlug === articleSlug)
+      : convs.find((c: Conversation) => !c.articleSlug);
+
+    if (match) {
+      setActiveConversationId(match.id);
+      const msgs = await api.getMessages(match.id);
+      setMessages(msgs);
+      return match.id;
+    }
+
+    return createConversation(articleSlug);
+  }, [createConversation]);
+
   const sendMessage = useCallback(async (
     content: string,
     context?: { articleSlug?: string; selectedText?: string; articleContent?: string },
   ) => {
-    const convId = activeConversationId ?? await createConversation(context?.articleSlug);
+    let convId = activeConversationId;
+    if (!convId) {
+      convId = await createConversation(context?.articleSlug);
+    }
 
     const userMsg: ChatMessage = { id: `temp-${Date.now()}`, role: 'user', content };
     setMessages((prev) => [...prev, userMsg]);
@@ -99,10 +120,42 @@ export function useChat() {
     }
   }, [activeConversationId, createConversation, loadConversations]);
 
+  const editMessage = useCallback(async (
+    messageId: string,
+    newContent: string,
+    context?: { articleSlug?: string; selectedText?: string; articleContent?: string },
+  ) => {
+    if (!activeConversationId) return;
+
+    await api.updateMessage(activeConversationId, messageId, newContent);
+    await api.deleteMessagesAfter(activeConversationId, messageId);
+
+    const msgs = await api.getMessages(activeConversationId);
+    setMessages(msgs);
+
+    await sendMessage(newContent, context);
+  }, [activeConversationId, sendMessage]);
+
   const stopStreaming = useCallback(() => { abortRef.current?.abort(); }, []);
+
+  const deleteConversation = useCallback(async (id: string) => {
+    await api.deleteConversation(id);
+    if (activeConversationId === id) {
+      setActiveConversationId(null);
+      setMessages([]);
+    }
+    await loadConversations();
+  }, [activeConversationId, loadConversations]);
+
+  const renameConversation = useCallback(async (id: string, title: string) => {
+    await api.updateConversation(id, { title });
+    await loadConversations();
+  }, [loadConversations]);
 
   return {
     conversations, activeConversationId, messages, isStreaming,
-    loadConversations, selectConversation, createConversation, sendMessage, stopStreaming,
+    loadConversations, selectConversation, createConversation,
+    findOrCreateSession, sendMessage, editMessage, stopStreaming,
+    deleteConversation, renameConversation,
   };
 }
