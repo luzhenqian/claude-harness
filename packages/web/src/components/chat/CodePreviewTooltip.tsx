@@ -47,10 +47,14 @@ function detectLanguage(filePath: string): string {
   return map[ext] ?? 'typescript';
 }
 
+const CHUNK_SIZE = 25;
+
 function TooltipContent({ filePath, lineRange }: { filePath: string; lineRange?: { start: number; end: number } }) {
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [visibleEnd, setVisibleEnd] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +67,31 @@ function TooltipContent({ filePath, lineRange }: { filePath: string; lineRange?:
     });
     return () => { cancelled = true; };
   }, [filePath]);
+
+  // Initialize visibleEnd when code loads
+  useEffect(() => {
+    if (!code) return;
+    const lines = code.split('\n');
+    const start = lineRange?.start ? Math.max(1, lineRange.start) : 1;
+    setVisibleEnd(Math.min(lines.length, start + CHUNK_SIZE - 1));
+  }, [code, lineRange]);
+
+  // Infinite scroll: load more lines when scrolled near bottom
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !code) return;
+    const lines = code.split('\n');
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      if (scrollHeight - scrollTop - clientHeight < 60) {
+        setVisibleEnd(prev => Math.min(lines.length, prev + CHUNK_SIZE));
+      }
+    };
+
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [code]);
 
   if (loading) {
     return (
@@ -82,8 +111,7 @@ function TooltipContent({ filePath, lineRange }: { filePath: string; lineRange?:
 
   const lines = code.split('\n');
   const start = lineRange?.start ? Math.max(1, lineRange.start) : 1;
-  const end = lineRange?.end ? Math.min(lines.length, lineRange.end) : Math.min(lines.length, start + 24);
-  const displayCode = lines.slice(start - 1, end).join('\n');
+  const displayCode = lines.slice(start - 1, visibleEnd).join('\n');
   const totalLines = lines.length;
   const lang = detectLanguage(filePath);
 
@@ -112,11 +140,11 @@ function TooltipContent({ filePath, lineRange }: { filePath: string; lineRange?:
           {filePath.split('/').pop()}
         </span>
         <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
-          L{start}-{end} / {totalLines}
+          L{start}-{visibleEnd} / {totalLines}
         </span>
       </div>
       {/* Code with syntax highlighting — same style as code browser */}
-      <div style={{ maxHeight: 320, overflow: 'auto', background: 'var(--bg-code)' }}>
+      <div ref={scrollRef} style={{ maxHeight: 320, overflow: 'auto', background: 'var(--bg-code)' }}>
         <SyntaxHighlighter
           language={lang}
           style={vscDarkPlus}
