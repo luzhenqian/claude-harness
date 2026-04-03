@@ -60,6 +60,19 @@ export class LlmService implements OnModuleInit {
     return provider;
   }
 
+  async getChatProviderConfig(id?: string): Promise<LlmProviderEntity> {
+    await this.loadProviders();
+    let record: LlmProviderEntity | null = null;
+    if (id) {
+      record = await this.repo.findOne({ where: { id, enabled: true } });
+    } else {
+      const records = await this.repo.find({ where: { enabled: true, type: 'chat' } });
+      record = records.find((r) => r.isDefault) ?? records[0] ?? null;
+    }
+    if (!record) throw new Error('No chat provider config available');
+    return record;
+  }
+
   async getEmbeddingProvider(): Promise<LLMProvider> {
     if (!this.embeddingProviders.size) await this.loadProviders();
     const provider = this.defaultEmbeddingId

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Agent } from '@mastra/core/agent';
+import { createOpenAI } from '@ai-sdk/openai';
 import { LlmService } from '../llm/llm.service';
 import { SearchService } from '../index/search.service';
 import { buildSystemPrompt, ChatContext } from './prompt.builder';
@@ -32,10 +33,13 @@ export class MastraService {
     conversationMessages: { role: string; content: string }[],
     context: ChatContext,
   ): AsyncIterable<MastraStreamEvent> {
-    // Get model config from DB
-    const provider = await this.llmService.getChatProvider();
-    const chatModel = (provider as any).chatModel || 'gpt-4o';
-    const modelId = `${provider.name}/${chatModel}` as any;
+    // Get model config from DB and build a typed AI SDK provider
+    const config = await this.llmService.getChatProviderConfig();
+    const openaiProvider = createOpenAI({
+      apiKey: config.apiKey,
+      ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
+    });
+    const model = openaiProvider(config.model);
 
     // Create tools
     const tools = {
@@ -50,7 +54,7 @@ export class MastraService {
       id: 'claude-harness-assistant',
       name: 'Claude Harness Assistant',
       instructions: buildSystemPrompt(context),
-      model: modelId,
+      model,
       tools,
     });
 
