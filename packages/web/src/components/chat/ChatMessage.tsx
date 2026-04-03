@@ -159,7 +159,7 @@ export function ChatMessage({ id, role, content, isStreaming, onEdit, thinkingSt
             </button>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'right' }}>
-            \u2318+Enter {t(locale, 'chat.saveResend')} \u00b7 Esc {t(locale, 'chat.cancel')}
+            ⌘+Enter {t(locale, 'chat.saveResend')} · Esc {t(locale, 'chat.cancel')}
           </div>
         </div>
       ) : (
