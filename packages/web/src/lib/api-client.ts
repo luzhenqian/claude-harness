@@ -45,4 +45,14 @@ export const api = {
       body: JSON.stringify({ content, context }),
     });
   },
+
+  updateMessage: (conversationId: string, messageId: string, content: string) =>
+    apiFetch<any>(`/conversations/${conversationId}/messages/${messageId}`, {
+      method: 'PATCH', body: JSON.stringify({ content }),
+    }),
+
+  deleteMessagesAfter: (conversationId: string, messageId: string) =>
+    apiFetch<{ deleted: number }>(`/conversations/${conversationId}/messages/${messageId}/after`, {
+      method: 'DELETE',
+    }),
 };
