@@ -18,6 +18,7 @@ export function ChatPage() {
     conversations, activeConversationId, messages, isStreaming,
     loadConversations, selectConversation, createConversation,
     sendMessage, editMessage, deleteConversation, renameConversation,
+    error, clearError,
   } = useChat();
   const initialized = useRef(false);
 
@@ -59,6 +60,14 @@ export function ChatPage() {
                 <ChatMessages messages={messages} onEditMessage={(id, content) => editMessage(id, content)} onSend={(content) => sendMessage(content)} />
               </div>
             </div>
+            {error && (
+              <div className="flex justify-center">
+                <div className="w-full max-w-3xl mx-4 mb-2 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400 flex items-center justify-between">
+                  <span>{error}</span>
+                  <button onClick={clearError} className="ml-4 text-red-400 hover:text-red-300">&times;</button>
+                </div>
+              </div>
+            )}
             <div className="flex justify-center">
               <div className="w-full max-w-3xl">
                 <ChatInput onSend={(content) => sendMessage(content)} disabled={isStreaming} />

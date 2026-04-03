@@ -24,6 +24,7 @@ export function ChatPanel({ onClose, articleSlug, articleContent, pendingMessage
   const {
     activeConversationId, messages, isStreaming,
     findOrCreateSession, createConversation, sendMessage, editMessage,
+    error, clearError,
   } = useChat();
   const locale = useLocale();
   const initialized = useRef(false);
@@ -161,6 +162,12 @@ export function ChatPanel({ onClose, articleSlug, articleContent, pendingMessage
         </div>
       </div>
       <ChatMessages messages={messages} onEditMessage={(id, content) => editMessage(id, content, { articleSlug, articleContent })} onSend={(content) => sendMessage(content, { articleSlug, articleContent })} />
+      {error && (
+        <div className="mx-3 mb-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-400 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={clearError} className="ml-3 text-red-400 hover:text-red-300">&times;</button>
+        </div>
+      )}
       <ChatInput onSend={(content) => sendMessage(content, { articleSlug, articleContent })} disabled={isStreaming} />
     </div>
   );
