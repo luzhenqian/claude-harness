@@ -39,14 +39,14 @@ function MotionLink({ href, className, style, variants, children }: {
   );
 }
 
-import { t, getArticleTag, heroDescription } from "@/lib/ui-translations";
+import { t, formatTemplate, getArticleTag, heroDescription } from "@/lib/ui-translations";
 
 const cellSizes = ['cell-xl', 'cell-lg', 'cell-md', 'cell-sm', 'cell-sm'];
 const cellColors = ['var(--accent)', 'var(--blue)', 'var(--green)', 'var(--purple)', 'var(--cyan)'];
 
 interface HomeClientProps {
   locale: string;
-  articles: { slug: string; title: string; description: string; order: number }[];
+  articles: { slug: string; title: string; description: string; order: number; readTime: number }[];
   moduleStats: { name: string; fileCount: number; lineCount: number; description: string }[];
   sourceSummary: { totalFiles: number; totalLines: number; totalModules: number };
 }
@@ -227,7 +227,7 @@ export default function HomeClient({ locale, articles, moduleStats, sourceSummar
                   <h3 className="article-title">{article.title}</h3>
                   <p className="article-desc">{article.description}</p>
                   <div className="article-footer">
-                    <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> {t(locale, 'home.readTime')}</span>
+                    <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> {formatTemplate(t(locale, 'article.readTime'), { readTime: article.readTime })}</span>
                     {i === 0 && (
                       <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> {t(locale, 'home.deepDive')}</span>
                     )}

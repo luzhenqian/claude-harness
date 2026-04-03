@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import matter from "gray-matter";
 
 import { existsSync } from "node:fs";
+import { estimateReadingTime } from "./reading-time";
 
 function findArticlesBase(): string {
   const cwd = process.cwd();
@@ -62,14 +63,14 @@ export async function getArticleList(locale: string): Promise<ArticleMeta[]> {
   for (const file of files) {
     if (!file.endsWith(".mdx")) continue;
     const raw = await readFile(resolve(dir, file), "utf-8");
-    const { data } = matter(raw);
+    const { data, content } = matter(raw);
     articles.push({
       slug: file.replace(/\.mdx$/, ""),
       title: data.title || file,
       description: data.description || "",
       order: data.order ?? 999,
       tags: data.tags || [],
-      readTime: data.readTime ?? 10,
+      readTime: estimateReadingTime(content),
       moduleCount: data.moduleCount ?? 0,
       modules: data.modules || [],
     });
@@ -103,7 +104,7 @@ export async function getArticle(slug: string, locale: string): Promise<{ meta: 
       description: data.description || "",
       order: data.order ?? 999,
       tags: data.tags || [],
-      readTime: data.readTime ?? 10,
+      readTime: estimateReadingTime(content),
       moduleCount: data.moduleCount ?? 0,
       modules: data.modules || [],
     },

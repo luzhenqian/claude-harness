@@ -2,11 +2,11 @@
 
 import { motion } from "motion/react";
 import Link from "next/link";
-import { t, getArticleTag } from "@/lib/ui-translations";
+import { t, formatTemplate, getArticleTag } from "@/lib/ui-translations";
 
 interface ArticlesClientProps {
   locale: string;
-  articles: { slug: string; title: string; description: string; order: number }[];
+  articles: { slug: string; title: string; description: string; order: number; readTime: number }[];
 }
 
 export default function ArticlesClient({ locale, articles }: ArticlesClientProps) {
@@ -28,7 +28,7 @@ export default function ArticlesClient({ locale, articles }: ArticlesClientProps
       <div className="articles-grid">
         {articles.map((article, index) => {
           const { tag, tagClass } = getArticleTag(locale, article.order);
-          const readTime = `${Math.max(8, 20 - article.order)} min read`;
+          const readTime = formatTemplate(t(locale, 'article.readTime'), { readTime: article.readTime });
 
           return (
             <motion.div
