@@ -11,7 +11,7 @@ import { createReadArticleTool } from './tools/read-article.tool';
 import { join, resolve } from 'path';
 
 export interface MastraStreamEvent {
-  type: 'tool_call' | 'tool_result' | 'text_delta' | 'steps' | 'error';
+  type: 'tool_call' | 'tool_result' | 'text_delta' | 'steps' | 'done' | 'error';
   [key: string]: any;
 }
 
@@ -106,6 +106,16 @@ export class MastraService {
       if (steps.length > 0) {
         yield { type: 'steps', steps };
       }
+
+      // Extract token usage from the stream result
+      const usage = await (result as any).usage;
+      yield {
+        type: 'done',
+        usage: {
+          inputTokens: usage?.promptTokens ?? 0,
+          outputTokens: usage?.completionTokens ?? 0,
+        },
+      };
     } catch (error) {
       yield { type: 'error', message: (error as Error).message };
     }
