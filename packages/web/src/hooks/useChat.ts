@@ -89,7 +89,7 @@ export function useChat() {
       if (response.status === 429) {
         const body = await response.json();
         const resetsAt = body.details?.resetsAt;
-        const resetTime = resetsAt ? new Date(resetsAt).toLocaleTimeString() : '';
+        const resetTime = resetsAt ? new Date(resetsAt).toLocaleTimeString(undefined, { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' }) : '';
         setError(
           `Daily token limit reached. Quota resets at ${resetTime} UTC.`
         );
