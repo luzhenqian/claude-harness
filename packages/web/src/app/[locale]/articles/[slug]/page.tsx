@@ -71,6 +71,7 @@ export default async function ArticlePage({ params }: Props) {
       tags={article.meta.tags}
       readTime={article.meta.readTime}
       moduleCount={article.meta.moduleCount}
+      modules={article.meta.modules}
     >
       {mdxContent}
       <CodeBlockCopyScript />

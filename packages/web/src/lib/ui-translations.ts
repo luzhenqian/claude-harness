@@ -58,9 +58,11 @@ const translations: Record<string, Record<string, string>> = {
     'article.readTime': '约 {readTime} 分钟',
     'article.moduleCount': '涉及 {moduleCount} 个模块',
     'article.toc': '目录',
-    'article.sidebarTitle': '文章信息',
+    'article.sidebarTitle': '涉及源码',
     'article.articleNum': '第 {order} 篇',
     'article.articleTotal': '共 {total} 篇',
+    'article.directory': '目录',
+    'article.file': '文件',
 
     // Tag labels
     'tagLabel.architecture': '架构',
@@ -216,9 +218,11 @@ const translations: Record<string, Record<string, string>> = {
     'article.readTime': '~{readTime} min read',
     'article.moduleCount': '{moduleCount} modules covered',
     'article.toc': 'Table of Contents',
-    'article.sidebarTitle': 'Article Info',
+    'article.sidebarTitle': 'Related Source',
     'article.articleNum': 'Article {order}',
     'article.articleTotal': 'of {total}',
+    'article.directory': 'directory',
+    'article.file': 'file',
 
     'tagLabel.architecture': 'Architecture',
     'tagLabel.tools': 'Tools',
@@ -373,9 +377,11 @@ const translations: Record<string, Record<string, string>> = {
     'article.readTime': '約{readTime}分',
     'article.moduleCount': '{moduleCount}モジュールを解析',
     'article.toc': '目次',
-    'article.sidebarTitle': '記事情報',
+    'article.sidebarTitle': '関連ソース',
     'article.articleNum': '第{order}回',
     'article.articleTotal': '全{total}回',
+    'article.directory': 'ディレクトリ',
+    'article.file': 'ファイル',
 
     'tagLabel.architecture': 'アーキテクチャ',
     'tagLabel.tools': 'ツール',

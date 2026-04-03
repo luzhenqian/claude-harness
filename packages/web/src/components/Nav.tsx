@@ -71,9 +71,7 @@ export function Footer() {
     <footer>
       <div>&copy; 2026 Claude Harness. {t(locale, 'nav.footer')}</div>
       <div style={{ display: 'flex', gap: '24px' }}>
-        <a href="#">GitHub</a>
-        <a href="#">Twitter</a>
-        <a href="#">Discord</a>
+        <a href="https://github.com/luzhenqian/claude-harness" target="_blank" rel="noopener noreferrer">GitHub</a>
       </div>
     </footer>
   );

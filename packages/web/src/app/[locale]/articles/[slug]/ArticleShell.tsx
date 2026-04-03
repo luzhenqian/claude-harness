@@ -16,6 +16,7 @@ interface ArticleShellProps {
   tags: string[];
   readTime: number;
   moduleCount: number;
+  modules: string[];
   children: React.ReactNode;
 }
 
@@ -68,7 +69,7 @@ function slugify(text: string, index: number): string {
   return `section-${index}`;
 }
 
-export default function ArticleShell({ locale, title, description, order, totalArticles, tags, readTime, moduleCount, children }: ArticleShellProps) {
+export default function ArticleShell({ locale, title, description, order, totalArticles, tags, readTime, moduleCount, modules, children }: ArticleShellProps) {
   const [progress, setProgress] = useState(0);
   const [activeId, setActiveId] = useState('');
   const [headings, setHeadings] = useState<Heading[]>([]);
@@ -302,10 +303,23 @@ export default function ArticleShell({ locale, title, description, order, totalA
 
         <aside className="right-gutter">
           <div className="gutter-label">{t(locale, 'article.sidebarTitle')}</div>
-          <div className="gutter-file">
-            {formatTemplate(t(locale, 'article.articleNum'), { order })}
-            <span className="gutter-lines">{formatTemplate(t(locale, 'article.articleTotal'), { total: totalArticles })}</span>
-          </div>
+          {modules.length > 0 ? (
+            modules.map((mod) => (
+              <Link
+                key={mod}
+                href={`/${locale}/code?file=${encodeURIComponent(mod)}`}
+                className="gutter-file"
+              >
+                {mod}
+                <span className="gutter-lines">{mod.endsWith('/') ? t(locale, 'article.directory') : t(locale, 'article.file')}</span>
+              </Link>
+            ))
+          ) : (
+            <div className="gutter-file">
+              {formatTemplate(t(locale, 'article.articleNum'), { order })}
+              <span className="gutter-lines">{formatTemplate(t(locale, 'article.articleTotal'), { total: totalArticles })}</span>
+            </div>
+          )}
         </aside>
       </div>
       {selection && (

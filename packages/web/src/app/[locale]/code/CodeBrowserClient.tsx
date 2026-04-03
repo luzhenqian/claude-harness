@@ -142,7 +142,8 @@ export default function CodeBrowserClient({ tree }: { tree: TreeNode[] }) {
   const searchParams = useSearchParams();
   const rawPath = searchParams.get("file") || searchParams.get("path") || "";
   // Strip leading "src/" if present — tree paths don't include it
-  const initialPath = rawPath.replace(/^src\//, '');
+  const initialPath = rawPath.replace(/^src\//, '').replace(/\/$/, '');
+  const isDirectoryPath = rawPath.endsWith('/');
 
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(null);
@@ -164,9 +165,9 @@ export default function CodeBrowserClient({ tree }: { tree: TreeNode[] }) {
     return paths;
   }, [initialPath]);
 
-  // Auto-select file from URL query param
+  // Auto-select file from URL query param (skip for directory paths — just expand)
   useEffect(() => {
-    if (initialPath && !selectedPath) {
+    if (initialPath && !selectedPath && !isDirectoryPath) {
       handleSelect(initialPath);
     }
   }, [initialPath]); // eslint-disable-line react-hooks/exhaustive-deps
