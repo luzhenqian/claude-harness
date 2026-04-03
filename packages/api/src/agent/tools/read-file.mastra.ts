@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { readFile } from 'fs/promises';
 import { join, resolve } from 'path';
@@ -18,7 +18,7 @@ export function createReadFileTool(sourceRoot: string) {
       filePath: z.string(),
       totalLines: z.number(),
     }),
-    execute: async ({ context: { file_path, start_line, end_line } }) => {
+    execute: async ({ file_path, start_line, end_line }: { file_path: string; start_line?: number; end_line?: number }) => {
       const fullPath = resolve(join(sourceRoot, file_path));
       if (!fullPath.startsWith(resolve(sourceRoot))) {
         return { content: 'Error: invalid file path.', filePath: file_path, totalLines: 0 };

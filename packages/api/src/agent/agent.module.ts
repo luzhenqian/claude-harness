@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { AgentService } from './agent.service';
+import { MastraService } from './mastra.service';
 import { LlmModule } from '../llm/llm.module';
+import { IndexModule } from '../index/index.module';
 
 @Module({
-  imports: [LlmModule],
-  providers: [AgentService],
-  exports: [AgentService],
+  imports: [LlmModule, IndexModule],
+  providers: [MastraService],
+  exports: [MastraService],
 })
 export class AgentModule {}

@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 
 export function createSearchFilesTool(searchService: {
@@ -22,7 +22,7 @@ export function createSearchFilesTool(searchService: {
         score: z.number(),
       })),
     }),
-    execute: async ({ context: { query, limit } }) => {
+    execute: async ({ query, limit }: { query: string; limit?: number }) => {
       const results = await searchService.searchCode(query, limit || 10);
       if (results.length === 0) return { results: [] };
       return {

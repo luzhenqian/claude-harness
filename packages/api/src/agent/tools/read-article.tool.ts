@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { readFile } from 'fs/promises';
 import { join, resolve } from 'path';
@@ -15,7 +15,7 @@ export function createReadArticleTool(articlesRoot: string) {
       content: z.string(),
       title: z.string(),
     }),
-    execute: async ({ context: { slug, locale } }) => {
+    execute: async ({ slug, locale }: { slug: string; locale?: string }) => {
       const lang = locale || 'en';
       const fullPath = resolve(join(articlesRoot, lang, `${slug}.mdx`));
       if (!fullPath.startsWith(resolve(articlesRoot))) {
