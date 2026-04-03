@@ -185,14 +185,17 @@ export function ChatMessage({ id, role, content, isStreaming, onEdit }: Props) {
         </div>
       )}
 
-      {/* Action buttons on hover */}
-      {hovering && !editing && !isStreaming && (
+      {/* Action buttons — always rendered, visibility toggled to avoid layout shift */}
+      {!editing && !isStreaming && (
         <div style={{
           display: 'flex',
           gap: 2,
           marginTop: 4,
-          animation: 'chat-fade-in 0.15s ease',
+          height: 22,
           alignSelf: isUser ? 'flex-end' : 'flex-start',
+          opacity: hovering ? 1 : 0,
+          visibility: hovering ? 'visible' : 'hidden',
+          transition: 'opacity 0.15s ease, visibility 0.15s ease',
         }}>
           {isUser && onEdit && (
             <button onClick={() => setEditing(true)} title={t(locale, 'chat.saveResend')}
