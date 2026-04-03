@@ -20,9 +20,6 @@ export function ChatWidget({ articleSlug, articleContent }: Props) {
   const pathname = usePathname();
   const isChatPage = pathname.split('/').filter(Boolean)[1] === 'chat';
   const [isOpen, setIsOpen] = useState(false);
-
-  // Don't render on the standalone chat page
-  if (isChatPage) return null;
   const [pendingMessage, setPendingMessage] = useState<{ content: string; context?: any } | null>(null);
 
   const open = useCallback((message?: string, context?: any) => {
@@ -30,7 +27,11 @@ export function ChatWidget({ articleSlug, articleContent }: Props) {
     if (message) setPendingMessage({ content: message, context });
   }, []);
 
+  // Always set handle so ArticleShell context menu can open the chat
   widgetHandle = { open };
+
+  // Don't render on the standalone chat page
+  if (isChatPage) return null;
 
   return (
     <>
