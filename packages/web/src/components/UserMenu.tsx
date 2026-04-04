@@ -51,13 +51,16 @@ export function UserMenu({ locale }: Props) {
         onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-card-hover)'}
         onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
         {user.avatarUrl ? (
-          <img src={user.avatarUrl} alt="" className="h-7 w-7 rounded-full" style={{ border: '1px solid var(--border)' }} />
-        ) : (
-          <div className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium"
-            style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
-            {user.name?.[0]?.toUpperCase() || '?'}
-          </div>
-        )}
+          <img src={user.avatarUrl} alt="" className="h-7 w-7 rounded-full"
+            style={{ border: '1px solid var(--border)' }}
+            referrerPolicy="no-referrer"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+          />
+        ) : null}
+        <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium${user.avatarUrl ? ' hidden' : ''}`}
+          style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+          {user.name?.[0]?.toUpperCase() || '?'}
+        </div>
         <ChevronDown size={12} />
       </button>
 
