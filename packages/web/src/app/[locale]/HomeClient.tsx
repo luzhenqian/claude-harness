@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { motion, type Variants } from "motion/react";
-import { SearchBar } from "@/components/SearchBar";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -97,15 +96,6 @@ export default function HomeClient({ locale, articles, moduleStats, sourceSummar
         >
           {heroDescription(locale, totalFiles, totalLinesK)}
         </motion.p>
-
-        <motion.div
-          className="w-full max-w-xl mx-auto mt-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.35 }}
-        >
-          <SearchBar />
-        </motion.div>
 
         <motion.div
           className="stats-bar"

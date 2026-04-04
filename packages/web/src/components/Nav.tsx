@@ -3,15 +3,29 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, Menu, X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { LocaleSwitcher } from "./LocaleSwitcher";
 import { t } from "@/lib/ui-translations";
 import { UserMenu } from './UserMenu';
+import { SearchBar } from "./SearchBar";
 
 export function Nav() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // ⌘K / Ctrl+K shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -63,7 +77,7 @@ export function Nav() {
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="nav-search" onClick={() => document.dispatchEvent(new CustomEvent("search-focus"))} style={{ cursor: 'pointer' }}>
+          <div className="nav-search" onClick={() => setSearchOpen(true)} style={{ cursor: 'pointer' }}>
             <Search className="h-3 w-3" />
             <span>{t(locale, 'nav.search')}</span>
             <kbd>⌘K</kbd>
@@ -99,6 +113,8 @@ export function Nav() {
           </div>
         </div>
       )}
+
+      <SearchBar isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );
 }

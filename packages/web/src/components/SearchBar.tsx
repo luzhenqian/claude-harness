@@ -5,15 +5,19 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { api, type SearchResponse } from "@/lib/api-client";
 
-export function SearchBar() {
+interface SearchBarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function SearchBar({ isOpen, onClose }: SearchBarProps) {
   const t = useTranslations("search");
   const locale = useLocale();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const abortRef = useRef<AbortController>(undefined);
@@ -25,10 +29,20 @@ export function SearchBar() {
     results.articles.forEach((_, i) => allItems.push({ type: "article", index: i }));
   }
 
+  // Focus input when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 0);
+    } else {
+      setQuery("");
+      setResults(null);
+      setActiveIndex(-1);
+    }
+  }, [isOpen]);
+
   const doSearch = useCallback(async (q: string) => {
     if (q.length < 2) {
       setResults(null);
-      setOpen(false);
       return;
     }
     abortRef.current?.abort();
@@ -39,7 +53,6 @@ export function SearchBar() {
       const data = await api.search(q, locale);
       if (!controller.signal.aborted) {
         setResults(data);
-        setOpen(true);
         setActiveIndex(-1);
       }
     } catch {
@@ -61,14 +74,13 @@ export function SearchBar() {
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
-      setOpen(false);
+      onClose();
       return;
     }
     if (e.key === "Enter") {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (activeIndex >= 0 && activeIndex < allItems.length) {
-        // Navigate to active item — handled by the Link click
-        const el = containerRef.current?.querySelector(`[data-search-index="${activeIndex}"]`) as HTMLAnchorElement;
+        const el = overlayRef.current?.querySelector(`[data-search-index="${activeIndex}"]`) as HTMLAnchorElement;
         el?.click();
       } else {
         doSearch(query);
@@ -83,125 +95,104 @@ export function SearchBar() {
       e.preventDefault();
       setActiveIndex((prev) => (prev > 0 ? prev - 1 : allItems.length - 1));
     }
-  }, [allItems.length, activeIndex, doSearch, query]);
+  }, [allItems.length, activeIndex, doSearch, query, onClose]);
 
-  // Close on click outside
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  // ⌘K shortcut and custom search-focus event
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        inputRef.current?.focus();
-        inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    };
-    const handleSearchFocus = () => {
-      inputRef.current?.focus();
-      inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    };
-    document.addEventListener("keydown", handleGlobalKeyDown);
-    document.addEventListener("search-focus", handleSearchFocus);
-    return () => {
-      document.removeEventListener("keydown", handleGlobalKeyDown);
-      document.removeEventListener("search-focus", handleSearchFocus);
-    };
-  }, []);
-
-  const closeAndReset = () => {
-    setQuery("");
-    setResults(null);
-    setOpen(false);
-    setActiveIndex(-1);
+  const handleResultClick = () => {
+    onClose();
   };
+
+  if (!isOpen) return null;
 
   const hasCode = results && results.code.length > 0;
   const hasArticles = results && results.articles.length > 0;
   const hasResults = hasCode || hasArticles;
+  const showResults = query.length >= 2;
   let flatIndex = 0;
 
   return (
-    <div ref={containerRef} className="relative">
-      <input
-        ref={inputRef}
-        type="text"
-        placeholder={t("placeholder")}
-        value={query}
-        onChange={(e) => handleChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onFocus={() => results && setOpen(true)}
-        className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm focus:border-[var(--accent)] focus:outline-none"
-      />
-
-      {open && query.length >= 2 && (
-        <div className="absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--bg)] shadow-lg">
-          {loading && (
-            <div className="px-3 py-2 text-sm text-neutral-500">{t("loading")}</div>
-          )}
-
-          {!loading && !hasResults && (
-            <div className="px-3 py-2 text-sm text-neutral-500">{t("noResults")}</div>
-          )}
-
-          {!loading && hasCode && (
-            <div>
-              <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                {t("codeSection")}
-              </div>
-              {results!.code.slice(0, 5).map((item, i) => {
-                const idx = flatIndex++;
-                return (
-                  <Link
-                    key={`code-${i}`}
-                    href={`/code/${item.filePath}#L${item.startLine}`}
-                    data-search-index={idx}
-                    className={`block px-3 py-2 text-sm hover:bg-neutral-800 ${activeIndex === idx ? "bg-neutral-800" : ""}`}
-                    onClick={closeAndReset}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-[var(--foreground)]">{item.name}</span>
-                      <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-400">{item.chunkType}</span>
-                    </div>
-                    <div className="truncate text-xs text-neutral-500">{item.filePath}</div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-
-          {!loading && hasArticles && (
-            <div>
-              <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                {t("articlesSection")}
-              </div>
-              {results!.articles.slice(0, 5).map((item, i) => {
-                const idx = flatIndex++;
-                return (
-                  <Link
-                    key={`article-${i}`}
-                    href={`/articles/${item.articleSlug}`}
-                    data-search-index={idx}
-                    className={`block px-3 py-2 text-sm hover:bg-neutral-800 ${activeIndex === idx ? "bg-neutral-800" : ""}`}
-                    onClick={closeAndReset}
-                  >
-                    <div className="font-medium text-[var(--foreground)]">{item.heading}</div>
-                    <div className="truncate text-xs text-neutral-500">{item.articleSlug}</div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]"
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div ref={overlayRef} className="w-full max-w-lg mx-4 rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-2xl">
+        <div className="flex items-center border-b border-[var(--border)] px-3">
+          <svg className="h-4 w-4 shrink-0 text-neutral-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={t("placeholder")}
+            value={query}
+            onChange={(e) => handleChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-full bg-transparent px-3 py-3 text-sm focus:outline-none"
+          />
+          <kbd className="shrink-0 rounded border border-[var(--border)] px-1.5 py-0.5 text-xs text-neutral-500">Esc</kbd>
         </div>
-      )}
+
+        {showResults && (
+          <div className="max-h-80 overflow-y-auto">
+            {loading && (
+              <div className="px-3 py-3 text-sm text-neutral-500">{t("loading")}</div>
+            )}
+
+            {!loading && !hasResults && (
+              <div className="px-3 py-3 text-sm text-neutral-500">{t("noResults")}</div>
+            )}
+
+            {!loading && hasCode && (
+              <div className="py-1">
+                <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                  {t("codeSection")}
+                </div>
+                {results!.code.slice(0, 5).map((item, i) => {
+                  const idx = flatIndex++;
+                  return (
+                    <Link
+                      key={`code-${i}`}
+                      href={`/code/${item.filePath}#L${item.startLine}`}
+                      data-search-index={idx}
+                      className={`block px-3 py-2 text-sm hover:bg-neutral-800 ${activeIndex === idx ? "bg-neutral-800" : ""}`}
+                      onClick={handleResultClick}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-[var(--foreground)]">{item.name}</span>
+                        <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-400">{item.chunkType}</span>
+                      </div>
+                      <div className="truncate text-xs text-neutral-500">{item.filePath}</div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {!loading && hasArticles && (
+              <div className="py-1">
+                <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                  {t("articlesSection")}
+                </div>
+                {results!.articles.slice(0, 5).map((item, i) => {
+                  const idx = flatIndex++;
+                  return (
+                    <Link
+                      key={`article-${i}`}
+                      href={`/articles/${item.articleSlug}`}
+                      data-search-index={idx}
+                      className={`block px-3 py-2 text-sm hover:bg-neutral-800 ${activeIndex === idx ? "bg-neutral-800" : ""}`}
+                      onClick={handleResultClick}
+                    >
+                      <div className="font-medium text-[var(--foreground)]">{item.heading}</div>
+                      <div className="truncate text-xs text-neutral-500">{item.articleSlug}</div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
