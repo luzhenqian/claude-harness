@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { t, formatTemplate } from '@/lib/ui-translations';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { useRouter } from 'next/navigation';
@@ -14,10 +14,23 @@ export default function LoginPage() {
   const locale = pathname.split('/').filter(Boolean)[0] || 'en';
   const { user } = useAuthContext();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Preserve redirect target from query param (e.g. middleware redirect)
+  useEffect(() => {
+    const redirect = searchParams.get('redirect');
+    if (redirect && !sessionStorage.getItem('auth_redirect')) {
+      sessionStorage.setItem('auth_redirect', redirect);
+    }
+  }, [searchParams]);
 
   // Redirect to home if already logged in
   useEffect(() => {
-    if (user) router.push(`/${locale}`);
+    if (user) {
+      const redirect = sessionStorage.getItem('auth_redirect');
+      sessionStorage.removeItem('auth_redirect');
+      router.push(redirect || `/${locale}`);
+    }
   }, [user, locale, router]);
 
   return (

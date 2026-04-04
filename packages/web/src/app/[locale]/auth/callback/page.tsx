@@ -15,14 +15,18 @@ export default function AuthCallbackPage() {
     const token = searchParams.get('token');
     if (token) {
       setToken(token);
+
+      const redirect = sessionStorage.getItem('auth_redirect');
+      sessionStorage.removeItem('auth_redirect');
+
       if (window.opener) {
         window.opener.location.reload();
         window.close();
       } else {
-        router.push('/');
+        router.push(redirect || `/${locale}`);
       }
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, locale]);
 
   return (
     <div className="flex h-screen items-center justify-center">

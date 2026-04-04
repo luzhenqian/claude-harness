@@ -31,6 +31,7 @@ export function UserMenu({ locale }: Props) {
   if (!user) {
     return (
       <Link href={`/${locale}/auth/login`}
+        onClick={() => sessionStorage.setItem('auth_redirect', window.location.pathname)}
         className="nav-btn" style={{ fontSize: '13px' }}>
         {t(locale, 'user.signIn')}
       </Link>
