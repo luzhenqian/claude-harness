@@ -149,16 +149,7 @@ claude-harness/
 │       └── ja/                    # 日本語記事
 │
 ├── packages/
-│   ├── claude-code-source/        # Claude Code ソースアーカイブ（読み取り専用）
-│   │   └── src/
-│   │       ├── commands/          # ~50 スラッシュコマンド
-│   │       ├── tools/             # ~40 エージェントツール
-│   │       ├── components/        # ~140 Ink UI コンポーネント
-│   │       ├── services/          # 外部サービス統合
-│   │       ├── bridge/            # IDE 統合（VS Code, JetBrains）
-│   │       ├── hooks/             # React Hooks
-│   │       └── ...               # 合計35モジュール
-│   │
+│   ├── claude-code-source/        # （ソースコードは配布終了 — README を参照）
 │   ├── scripts/                   # メタデータ生成パイプライン
 │   │   └── src/
 │   │       ├── generate-file-tree.ts
@@ -183,7 +174,7 @@ claude-harness/
 
 ## データ生成パイプライン
 
-`pnpm generate` コマンドは4つのスクリプトを実行し、Claude Code ソースを構造化メタデータに処理します：
+`pnpm generate` コマンドは4つのスクリプトを実行し、ローカルに用意した Claude Code ソースを構造化メタデータに処理します：
 
 1. **ファイルツリー** — ソースディレクトリを再帰的にスキャンし、階層 JSON ツリーを生成（1,902エントリ）
 2. **モジュール統計** — 35のトップレベルモジュールのファイル数・行数を分析
@@ -216,8 +207,7 @@ claude-harness/
                             |
                   +---------v---------+
                   | Claude Code Source |
-                  | (read-only archive)|
-                  | 1,902 files  514K  |
+                  |   (配布終了)        |
                   +--------------------+
 ```
 

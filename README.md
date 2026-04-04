@@ -149,16 +149,7 @@ claude-harness/
 │       └── ja/                    # Japanese articles
 │
 ├── packages/
-│   ├── claude-code-source/        # Claude Code source archive (read-only)
-│   │   └── src/
-│   │       ├── commands/          # ~50 slash commands
-│   │       ├── tools/             # ~40 agent tools
-│   │       ├── components/        # ~140 Ink UI components
-│   │       ├── services/          # External integrations
-│   │       ├── bridge/            # IDE integration (VS Code, JetBrains)
-│   │       ├── hooks/             # React hooks
-│   │       └── ...               # 35 modules total
-│   │
+│   ├── claude-code-source/        # (source no longer distributed — see its README)
 │   ├── scripts/                   # Metadata generation pipeline
 │   │   └── src/
 │   │       ├── generate-file-tree.ts
@@ -183,7 +174,7 @@ claude-harness/
 
 ## Data Generation Pipeline
 
-The `pnpm generate` command runs four scripts that process the Claude Code source into structured metadata:
+The `pnpm generate` command runs four scripts that process Claude Code source (provided locally) into structured metadata:
 
 1. **File Tree** — Recursively scans the source directory into a hierarchical JSON tree (1,902 entries)
 2. **Module Stats** — Analyzes 35 top-level modules with file/line counts
@@ -216,8 +207,7 @@ These generated files power the web UI's code browser, module explorer, and sear
                             |
                   +---------v---------+
                   | Claude Code Source |
-                  | (read-only archive)|
-                  | 1,902 files  514K  |
+                  |  (not distributed) |
                   +--------------------+
 ```
 

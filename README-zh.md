@@ -149,16 +149,7 @@ claude-harness/
 │       └── ja/                    # 日文文章
 │
 ├── packages/
-│   ├── claude-code-source/        # Claude Code 源码存档（只读）
-│   │   └── src/
-│   │       ├── commands/          # ~50 个斜杠命令
-│   │       ├── tools/             # ~40 个代理工具
-│   │       ├── components/        # ~140 个 Ink UI 组件
-│   │       ├── services/          # 外部服务集成
-│   │       ├── bridge/            # IDE 集成（VS Code, JetBrains）
-│   │       ├── hooks/             # React Hooks
-│   │       └── ...               # 共 35 个模块
-│   │
+│   ├── claude-code-source/        # （源码不再分发 — 详见其 README）
 │   ├── scripts/                   # 元数据生成管线
 │   │   └── src/
 │   │       ├── generate-file-tree.ts
@@ -183,7 +174,7 @@ claude-harness/
 
 ## 数据生成管线
 
-`pnpm generate` 命令运行四个脚本，将 Claude Code 源码处理为结构化元数据：
+`pnpm generate` 命令运行四个脚本，将本地提供的 Claude Code 源码处理为结构化元数据：
 
 1. **文件树** — 递归扫描源码目录，生成层级 JSON 树（1,902 个条目）
 2. **模块统计** — 分析 35 个顶级模块的文件数与代码行数
@@ -216,8 +207,7 @@ claude-harness/
                             |
                   +---------v---------+
                   | Claude Code Source |
-                  | (read-only archive)|
-                  | 1,902 files  514K  |
+                  |    (不再分发)       |
                   +--------------------+
 ```
 
