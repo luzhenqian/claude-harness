@@ -115,10 +115,10 @@ export function ChatPage() {
                 fontSize: 16, fontWeight: 600, marginBottom: 8, color: 'var(--text)',
                 fontFamily: "'JetBrains Mono', monospace",
               }}>
-                {locale === 'zh' ? '\u5173\u4e8e Claude Code' : locale === 'ja' ? 'Claude Code \u306b\u3064\u3044\u3066' : 'About Claude Code'}
+                {t(locale, 'chat.askAbout')}
               </h3>
               <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>
-                {locale === 'zh' ? '\u9009\u62e9\u5de6\u4fa7\u5bf9\u8bdd\u6216\u5f00\u59cb\u65b0\u7684\u8ba8\u8bba' : t(locale, 'chat.selectOrNew')}
+                {t(locale, 'chat.selectOrNew')}
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {[t(locale, 'chat.quickQ1'), t(locale, 'chat.quickQ2'), t(locale, 'chat.quickQ3')].map((q) => (

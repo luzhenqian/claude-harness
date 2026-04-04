@@ -167,6 +167,7 @@ const translations: Record<string, Record<string, string>> = {
     'user.loginDesc': '选择一种方式登录，开始探索 Claude Code 的源码和架构。',
     'user.continueWith': '使用 {provider} 登录',
     'user.terms': '登录即表示你同意我们的服务条款和隐私政策。',
+    'user.signingIn': '正在登录...',
   },
   en: {
     'nav.articles': 'Articles',
@@ -326,6 +327,7 @@ const translations: Record<string, Record<string, string>> = {
     'user.loginDesc': 'Choose a sign-in method to start exploring Claude Code\'s source and architecture.',
     'user.continueWith': 'Continue with {provider}',
     'user.terms': 'By signing in, you agree to our Terms of Service and Privacy Policy.',
+    'user.signingIn': 'Signing in...',
   },
   ja: {
     'nav.articles': '記事',
@@ -485,6 +487,7 @@ const translations: Record<string, Record<string, string>> = {
     'user.loginDesc': 'ログイン方法を選択して、Claude Code のソースとアーキテクチャの探索を始めましょう。',
     'user.continueWith': '{provider} で続行',
     'user.terms': 'ログインすることで、利用規約とプライバシーポリシーに同意したことになります。',
+    'user.signingIn': 'ログイン中...',
   },
 };
 

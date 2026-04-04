@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { setToken } from '@/lib/auth';
+import { t } from '@/lib/ui-translations';
 
 export default function AuthCallbackPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = pathname.split('/').filter(Boolean)[0] || 'en';
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -23,7 +26,7 @@ export default function AuthCallbackPage() {
 
   return (
     <div className="flex h-screen items-center justify-center">
-      <p className="text-neutral-400">Signing in...</p>
+      <p className="text-neutral-400">{t(locale, 'user.signingIn')}</p>
     </div>
   );
 }
