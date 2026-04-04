@@ -28,5 +28,12 @@
     "selectFile": "ファイルツリーからファイルを選択してソースコードを表示します。",
     "fileNotFound": "ファイルが見つかりません：{path}",
     "searchPlaceholder": "ソースコードを検索..."
+  },
+  "search": {
+    "placeholder": "コードと記事を検索...",
+    "noResults": "結果が見つかりません",
+    "codeSection": "コード",
+    "articlesSection": "記事",
+    "loading": "検索中..."
   }
 }

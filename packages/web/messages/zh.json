@@ -28,5 +28,12 @@
     "selectFile": "从左侧文件树中选择文件查看源码。",
     "fileNotFound": "文件未找到：{path}",
     "searchPlaceholder": "搜索源代码..."
+  },
+  "search": {
+    "placeholder": "搜索代码和文章...",
+    "noResults": "未找到结果",
+    "codeSection": "代码",
+    "articlesSection": "文章",
+    "loading": "搜索中..."
   }
 }

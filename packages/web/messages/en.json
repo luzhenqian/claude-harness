@@ -28,5 +28,12 @@
     "selectFile": "Select a file from the tree to view its source code.",
     "fileNotFound": "File not found: {path}",
     "searchPlaceholder": "Search source code..."
+  },
+  "search": {
+    "placeholder": "Search code and articles...",
+    "noResults": "No results found",
+    "codeSection": "Code",
+    "articlesSection": "Articles",
+    "loading": "Searching..."
   }
 }
