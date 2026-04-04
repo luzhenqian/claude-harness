@@ -1,73 +1,182 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-
-interface SearchResult {
-  path: string;
-  line: number;
-  text: string;
-}
+import { api, type SearchResponse } from "@/lib/api-client";
 
 export function SearchBar() {
-  const t = useTranslations("code");
+  const t = useTranslations("search");
+  const locale = useLocale();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [index, setIndex] = useState<{ path: string; lines: { num: number; text: string }[] }[]>([]);
+  const [results, setResults] = useState<SearchResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const abortRef = useRef<AbortController>(undefined);
 
+  // All navigable result items flattened for keyboard nav
+  const allItems: { type: "code" | "article"; index: number }[] = [];
+  if (results) {
+    results.code.forEach((_, i) => allItems.push({ type: "code", index: i }));
+    results.articles.forEach((_, i) => allItems.push({ type: "article", index: i }));
+  }
+
+  const doSearch = useCallback(async (q: string) => {
+    if (q.length < 2) {
+      setResults(null);
+      setOpen(false);
+      return;
+    }
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setLoading(true);
+    try {
+      const data = await api.search(q, locale);
+      if (!controller.signal.aborted) {
+        setResults(data);
+        setOpen(true);
+        setActiveIndex(-1);
+      }
+    } catch {
+      if (!controller.signal.aborted) {
+        setResults(null);
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [locale]);
+
+  const handleChange = useCallback((value: string) => {
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(value), 300);
+  }, [doSearch]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (e.key === "Enter") {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (activeIndex >= 0 && activeIndex < allItems.length) {
+        // Navigate to active item — handled by the Link click
+        const el = containerRef.current?.querySelector(`[data-search-index="${activeIndex}"]`) as HTMLAnchorElement;
+        el?.click();
+      } else {
+        doSearch(query);
+      }
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((prev) => (prev < allItems.length - 1 ? prev + 1 : 0));
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((prev) => (prev > 0 ? prev - 1 : allItems.length - 1));
+    }
+  }, [allItems.length, activeIndex, doSearch, query]);
+
+  // Close on click outside
   useEffect(() => {
-    fetch("/search-index.json")
-      .then((r) => r.json())
-      .then(setIndex)
-      .catch(() => {});
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const search = useCallback(
-    (q: string) => {
-      setQuery(q);
-      if (q.length < 3) {
-        setResults([]);
-        return;
-      }
-      const lower = q.toLowerCase();
-      const matches: SearchResult[] = [];
-      for (const file of index) {
-        for (const line of file.lines) {
-          if (line.text.toLowerCase().includes(lower)) {
-            matches.push({ path: file.path, line: line.num, text: line.text.trim() });
-            if (matches.length >= 50) break;
-          }
-        }
-        if (matches.length >= 50) break;
-      }
-      setResults(matches);
-    },
-    [index]
-  );
+  const closeAndReset = () => {
+    setQuery("");
+    setResults(null);
+    setOpen(false);
+    setActiveIndex(-1);
+  };
+
+  const hasCode = results && results.code.length > 0;
+  const hasArticles = results && results.articles.length > 0;
+  const hasResults = hasCode || hasArticles;
+  let flatIndex = 0;
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <input
         type="text"
-        placeholder={t("searchPlaceholder")}
+        placeholder={t("placeholder")}
         value={query}
-        onChange={(e) => search(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onFocus={() => results && setOpen(true)}
         className="w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm focus:border-[var(--accent)] focus:outline-none"
       />
-      {results.length > 0 && (
-        <div className="absolute z-10 mt-1 max-h-80 w-full overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--bg)]">
-          {results.map((r, i) => (
-            <Link
-              key={`${r.path}:${r.line}:${i}`}
-              href={`/code/${r.path}`}
-              className="block border-b border-[var(--border)] px-3 py-2 text-sm hover:bg-neutral-900"
-              onClick={() => { setQuery(""); setResults([]); }}
-            >
-              <span className="font-mono text-xs text-[var(--accent)]">{r.path}:{r.line}</span>
-              <p className="truncate text-neutral-400">{r.text}</p>
-            </Link>
-          ))}
+
+      {open && query.length >= 2 && (
+        <div className="absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--bg)] shadow-lg">
+          {loading && (
+            <div className="px-3 py-2 text-sm text-neutral-500">{t("loading")}</div>
+          )}
+
+          {!loading && !hasResults && (
+            <div className="px-3 py-2 text-sm text-neutral-500">{t("noResults")}</div>
+          )}
+
+          {!loading && hasCode && (
+            <div>
+              <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                {t("codeSection")}
+              </div>
+              {results!.code.slice(0, 5).map((item, i) => {
+                const idx = flatIndex++;
+                return (
+                  <Link
+                    key={`code-${i}`}
+                    href={`/code/${item.filePath}#L${item.startLine}`}
+                    data-search-index={idx}
+                    className={`block px-3 py-2 text-sm hover:bg-neutral-800 ${activeIndex === idx ? "bg-neutral-800" : ""}`}
+                    onClick={closeAndReset}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-[var(--foreground)]">{item.name}</span>
+                      <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-400">{item.chunkType}</span>
+                    </div>
+                    <div className="truncate text-xs text-neutral-500">{item.filePath}</div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {!loading && hasArticles && (
+            <div>
+              <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                {t("articlesSection")}
+              </div>
+              {results!.articles.slice(0, 5).map((item, i) => {
+                const idx = flatIndex++;
+                return (
+                  <Link
+                    key={`article-${i}`}
+                    href={`/articles/${item.articleSlug}`}
+                    data-search-index={idx}
+                    className={`block px-3 py-2 text-sm hover:bg-neutral-800 ${activeIndex === idx ? "bg-neutral-800" : ""}`}
+                    onClick={closeAndReset}
+                  >
+                    <div className="font-medium text-[var(--foreground)]">{item.heading}</div>
+                    <div className="truncate text-xs text-neutral-500">{item.articleSlug}</div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
