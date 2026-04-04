@@ -22,14 +22,15 @@ interface MermaidDiagramProps {
 
 function isNativeMermaidType(chart: string): boolean {
   const t = chart.trim();
-  return (
-    /^sequenceDiagram/i.test(t) ||
-    /^classDiagram/i.test(t)
-  );
+  return /^sequenceDiagram/i.test(t);
 }
 
 function isStateDiagram(chart: string): boolean {
   return /^stateDiagram/i.test(chart.trim());
+}
+
+function isClassDiagram(chart: string): boolean {
+  return /^classDiagram/i.test(chart.trim());
 }
 
 // ─── Color Palette ────────────────────────────────────────────────
@@ -1168,6 +1169,320 @@ function DiagramViewport({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ─── Class Diagram Parser & Renderer ─────────────────────────────
+
+interface ClassDef {
+  name: string;
+  members: { label: string; isMethod: boolean }[];
+}
+
+interface ClassRelation {
+  from: string;
+  to: string;
+  label?: string;
+  dashed: boolean;
+}
+
+function parseClassDiagram(chart: string): { classes: ClassDef[]; relations: ClassRelation[] } {
+  const classes: ClassDef[] = [];
+  const relations: ClassRelation[] = [];
+  let current: ClassDef | null = null;
+
+  for (const line of chart.split("\n")) {
+    const trimmed = line.trim();
+    if (/^classDiagram/i.test(trimmed) || !trimmed) continue;
+
+    // Class start: class ClassName {
+    const classStart = trimmed.match(/^class\s+(\w+)\s*\{/);
+    if (classStart) {
+      current = { name: classStart[1], members: [] };
+      continue;
+    }
+
+    // Class end
+    if (trimmed === "}" && current) {
+      classes.push(current);
+      current = null;
+      continue;
+    }
+
+    // Member inside class block
+    if (current) {
+      const memberMatch = trimmed.match(/^[+\-#~](.+)$/);
+      if (memberMatch) {
+        const raw = memberMatch[1].trim();
+        const isMethod = /\(/.test(raw);
+        current.members.push({ label: trimmed, isMethod });
+      }
+      continue;
+    }
+
+    // Relationships: A --> B : label  or  A ..> B : label
+    const relMatch = trimmed.match(/^(\w+)\s+(-->|\.\.>)\s+(\w+)(?:\s*:\s*(.+))?$/);
+    if (relMatch) {
+      relations.push({
+        from: relMatch[1],
+        to: relMatch[3],
+        label: relMatch[4]?.trim(),
+        dashed: relMatch[2] === "..>",
+      });
+    }
+  }
+
+  return { classes, relations };
+}
+
+function ClassDiagramRenderer({ chart }: { chart: string }) {
+  const { classes, relations } = parseClassDiagram(chart);
+
+  // Layout constants
+  const PADDING_X = 24;
+  const PADDING_TOP = 16;
+  const LINE_HEIGHT = 22;
+  const HEADER_HEIGHT = 38;
+  const SECTION_GAP = 8;
+  const CLASS_GAP_X = 60;
+  const CLASS_GAP_Y = 60;
+  const FONT_SIZE = 13;
+  const FONT_FAMILY = "'JetBrains Mono', monospace";
+
+  // Measure text width (approximate)
+  const measureText = (text: string) =>
+    [...text].reduce((w, ch) => w + (ch.charCodeAt(0) > 0x2e7f ? FONT_SIZE : FONT_SIZE * 0.62), 0) + PADDING_X * 2;
+
+  // Compute class box dimensions
+  const classBoxes = classes.map((cls, idx) => {
+    const pal = getPalette(idx);
+    const nameWidth = measureText(cls.name);
+    const memberWidths = cls.members.map((m) => measureText(m.label));
+    const width = Math.max(nameWidth, ...memberWidths, 180);
+
+    // Split members into properties and methods
+    const props = cls.members.filter((m) => !m.isMethod);
+    const methods = cls.members.filter((m) => m.isMethod);
+    const sections: { label: string }[][] = [];
+    if (props.length > 0) sections.push(props);
+    if (methods.length > 0) sections.push(methods);
+
+    let height = HEADER_HEIGHT;
+    for (let s = 0; s < sections.length; s++) {
+      height += PADDING_TOP + sections[s].length * LINE_HEIGHT;
+      if (s < sections.length - 1) height += SECTION_GAP;
+    }
+    height += 12; // bottom padding
+
+    return { cls, pal, width, height, props, methods, sections };
+  });
+
+  // Simple layout: first class on top, related classes below
+  const positions = new Map<string, { x: number; y: number; width: number; height: number }>();
+
+  if (classBoxes.length === 1) {
+    positions.set(classBoxes[0].cls.name, { x: 40, y: 40, width: classBoxes[0].width, height: classBoxes[0].height });
+  } else if (classBoxes.length > 1) {
+    // Find the "root" class (appears as `from` in relations, or first class)
+    const fromSet = new Set(relations.map((r) => r.from));
+    const rootIdx = classBoxes.findIndex((b) => fromSet.has(b.cls.name));
+    const root = rootIdx >= 0 ? rootIdx : 0;
+
+    // Calculate total width of child classes
+    const children = classBoxes.filter((_, i) => i !== root);
+    const totalChildWidth = children.reduce((sum, b) => sum + b.width, 0) + CLASS_GAP_X * (children.length - 1);
+    const rootBox = classBoxes[root];
+    const totalWidth = Math.max(rootBox.width, totalChildWidth);
+
+    // Root centered on top
+    const rootX = 40 + (totalWidth - rootBox.width) / 2;
+    positions.set(rootBox.cls.name, { x: rootX, y: 40, width: rootBox.width, height: rootBox.height });
+
+    // Children in a row below
+    let childX = 40 + (totalWidth - totalChildWidth) / 2;
+    const childY = 40 + rootBox.height + CLASS_GAP_Y;
+    for (const child of children) {
+      positions.set(child.cls.name, { x: childX, y: childY, width: child.width, height: child.height });
+      childX += child.width + CLASS_GAP_X;
+    }
+  }
+
+  // Calculate SVG dimensions
+  let svgWidth = 0;
+  let svgHeight = 0;
+  for (const pos of positions.values()) {
+    svgWidth = Math.max(svgWidth, pos.x + pos.width + 40);
+    svgHeight = Math.max(svgHeight, pos.y + pos.height + 40);
+  }
+
+  return (
+    <div style={{ display: "flex", justifyContent: "center", overflow: "auto" }}>
+      <svg width={svgWidth} height={svgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`}>
+        <defs>
+          <marker id="class-arrow" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 4 L 0 8 z" fill="#64748b" />
+          </marker>
+          <marker id="class-arrow-open" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 4 L 0 8" fill="none" stroke="#64748b" strokeWidth="1.5" />
+          </marker>
+        </defs>
+
+        {/* Relations */}
+        {relations.map((rel, i) => {
+          const fromPos = positions.get(rel.from);
+          const toPos = positions.get(rel.to);
+          if (!fromPos || !toPos) return null;
+
+          // Connect from bottom-center of `from` to top-center of `to`
+          const fromCx = fromPos.x + fromPos.width / 2;
+          const fromCy = fromPos.y + fromPos.height;
+          const toCx = toPos.x + toPos.width / 2;
+          const toCy = toPos.y;
+
+          // Curved path
+          const midY = (fromCy + toCy) / 2;
+          const d = `M ${fromCx} ${fromCy} C ${fromCx} ${midY}, ${toCx} ${midY}, ${toCx} ${toCy}`;
+
+          // Label position
+          const labelX = (fromCx + toCx) / 2;
+          const labelY = midY;
+          const labelW = rel.label
+            ? [...rel.label].reduce((w, ch) => w + (ch.charCodeAt(0) > 0x2e7f ? 12 : 7), 0) + 16
+            : 0;
+
+          return (
+            <g key={i}>
+              <path
+                d={d}
+                fill="none"
+                stroke="#475569"
+                strokeWidth="1.5"
+                strokeDasharray={rel.dashed ? "6 4" : undefined}
+                markerEnd={rel.dashed ? "url(#class-arrow-open)" : "url(#class-arrow)"}
+              />
+              {rel.label && (
+                <>
+                  <rect
+                    x={labelX - labelW / 2}
+                    y={labelY - 10}
+                    width={labelW}
+                    height={20}
+                    rx={4}
+                    fill="var(--bg-elevated, #1a1a1a)"
+                    fillOpacity="0.95"
+                  />
+                  <text
+                    x={labelX}
+                    y={labelY}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fill="var(--text-muted, #94a3b8)"
+                    fontSize="11"
+                    fontFamily={FONT_FAMILY}
+                  >
+                    {rel.label}
+                  </text>
+                </>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Class boxes */}
+        {classBoxes.map((box, bIdx) => {
+          const pos = positions.get(box.cls.name);
+          if (!pos) return null;
+          const { x, y, width } = pos;
+          const pal = box.pal;
+
+          let curY = y;
+
+          return (
+            <g key={bIdx}>
+              {/* Background */}
+              <rect
+                x={x}
+                y={y}
+                width={width}
+                height={pos.height}
+                rx={10}
+                fill={pal.bg}
+                stroke={pal.border}
+                strokeWidth="1"
+              />
+
+              {/* Class name header */}
+              <text
+                x={x + width / 2}
+                y={y + HEADER_HEIGHT / 2 + 1}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill={pal.text}
+                fontSize={FONT_SIZE + 1}
+                fontWeight="700"
+                fontFamily={FONT_FAMILY}
+              >
+                {box.cls.name}
+              </text>
+              {/* Header separator */}
+              <line
+                x1={x + 1}
+                y1={y + HEADER_HEIGHT}
+                x2={x + width - 1}
+                y2={y + HEADER_HEIGHT}
+                stroke={pal.border}
+                strokeOpacity="0.4"
+              />
+              {(() => {
+                curY = y + HEADER_HEIGHT;
+                return null;
+              })()}
+
+              {/* Sections */}
+              {box.sections.map((section, sIdx) => {
+                const sectionStartY = curY + PADDING_TOP;
+                const elements = section.map((member, mIdx) => (
+                  <text
+                    key={`${sIdx}-${mIdx}`}
+                    x={x + PADDING_X}
+                    y={sectionStartY + mIdx * LINE_HEIGHT + LINE_HEIGHT / 2}
+                    dominantBaseline="central"
+                    fill="var(--text-dim, #b0b8c4)"
+                    fontSize={FONT_SIZE}
+                    fontFamily={FONT_FAMILY}
+                  >
+                    {member.label}
+                  </text>
+                ));
+                const sectionHeight = PADDING_TOP + section.length * LINE_HEIGHT;
+                curY += sectionHeight;
+
+                // Separator between sections
+                const separator = sIdx < box.sections.length - 1 ? (
+                  <line
+                    key={`sep-${sIdx}`}
+                    x1={x + 1}
+                    y1={curY + SECTION_GAP / 2}
+                    x2={x + width - 1}
+                    y2={curY + SECTION_GAP / 2}
+                    stroke={pal.border}
+                    strokeOpacity="0.4"
+                  />
+                ) : null;
+                if (sIdx < box.sections.length - 1) curY += SECTION_GAP;
+
+                return (
+                  <g key={sIdx}>
+                    {elements}
+                    {separator}
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────
 
 export function MermaidDiagram({ chart }: MermaidDiagramProps) {
@@ -1178,6 +1493,8 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
       <DiagramViewport>
         {isNativeMermaidType(trimmed) ? (
           <NativeMermaid chart={trimmed} />
+        ) : isClassDiagram(trimmed) ? (
+          <ClassDiagramRenderer chart={trimmed} />
         ) : (
           <CustomGraphDiagram chart={trimmed} />
         )}
