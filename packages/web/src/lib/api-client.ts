@@ -16,6 +16,25 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return res.json();
 }
 
+export interface SearchResponse {
+  code: {
+    filePath: string;
+    name: string;
+    chunkType: string;
+    content: string;
+    startLine: number;
+    endLine: number;
+    score: number;
+  }[];
+  articles: {
+    articleSlug: string;
+    heading: string;
+    content: string;
+    locale: string;
+    score: number;
+  }[];
+}
+
 export const api = {
   getMe: () => apiFetch<{ id: string; name: string; avatarUrl: string }>('/auth/me'),
 
@@ -56,4 +75,7 @@ export const api = {
     apiFetch<{ deleted: number }>(`/conversations/${conversationId}/messages/${messageId}/after`, {
       method: 'DELETE',
     }),
+
+  search: (q: string, locale: string, limit: number = 5) =>
+    apiFetch<SearchResponse>(`/search?q=${encodeURIComponent(q)}&locale=${locale}&limit=${limit}`),
 };
