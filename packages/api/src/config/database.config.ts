@@ -1,6 +1,10 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
+import { InitialSchema1712102400000 } from '../migrations/1712102400000-InitialSchema';
+import { AddTokenQuota1743724800000 } from '../migrations/1743724800000-AddTokenQuota';
+
+const migrations = [InitialSchema1712102400000, AddTokenQuota1743724800000];
 
 export const getDatabaseConfig = (
   configService: ConfigService,
@@ -13,7 +17,7 @@ export const getDatabaseConfig = (
       url,
       autoLoadEntities: true,
       synchronize: false,
-      migrations: ['dist/migrations/*.js'],
+      migrations,
     };
   }
 
@@ -26,7 +30,7 @@ export const getDatabaseConfig = (
     password: configService.get('DATABASE_PASSWORD', 'postgres'),
     autoLoadEntities: true,
     synchronize: false,
-    migrations: ['dist/migrations/*.js'],
+    migrations,
   };
 };
 
@@ -42,5 +46,5 @@ export default new DataSource({
     password: process.env.DATABASE_PASSWORD || 'postgres',
   } : {}),
   entities: ['src/**/*.entity.ts'],
-  migrations: ['src/migrations/*.ts'],
+  migrations,
 });
