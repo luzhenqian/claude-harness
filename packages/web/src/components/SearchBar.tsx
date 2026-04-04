@@ -14,6 +14,7 @@ export function SearchBar() {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const abortRef = useRef<AbortController>(undefined);
 
@@ -95,6 +96,27 @@ export function SearchBar() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // ⌘K shortcut and custom search-focus event
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    };
+    const handleSearchFocus = () => {
+      inputRef.current?.focus();
+      inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    document.addEventListener("search-focus", handleSearchFocus);
+    return () => {
+      document.removeEventListener("keydown", handleGlobalKeyDown);
+      document.removeEventListener("search-focus", handleSearchFocus);
+    };
+  }, []);
+
   const closeAndReset = () => {
     setQuery("");
     setResults(null);
@@ -110,6 +132,7 @@ export function SearchBar() {
   return (
     <div ref={containerRef} className="relative">
       <input
+        ref={inputRef}
         type="text"
         placeholder={t("placeholder")}
         value={query}

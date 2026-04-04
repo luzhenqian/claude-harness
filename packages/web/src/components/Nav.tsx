@@ -63,7 +63,7 @@ export function Nav() {
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="nav-search">
+          <div className="nav-search" onClick={() => document.dispatchEvent(new CustomEvent("search-focus"))} style={{ cursor: 'pointer' }}>
             <Search className="h-3 w-3" />
             <span>{t(locale, 'nav.search')}</span>
             <kbd>⌘K</kbd>
