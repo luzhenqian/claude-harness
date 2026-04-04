@@ -115,7 +115,7 @@ export function SearchBar({ isOpen, onClose }: SearchBarProps) {
       style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div ref={overlayRef} className="w-full max-w-lg mx-4 rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-2xl">
+      <div ref={overlayRef} className="w-full max-w-2xl mx-4 rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-2xl">
         <div className="flex items-center border-b border-[var(--border)] px-3">
           <svg className="h-4 w-4 shrink-0 text-neutral-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
@@ -133,7 +133,7 @@ export function SearchBar({ isOpen, onClose }: SearchBarProps) {
         </div>
 
         {showResults && (
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto">
             {loading && (
               <div className="px-3 py-3 text-sm text-neutral-500">{t("loading")}</div>
             )}
@@ -142,52 +142,56 @@ export function SearchBar({ isOpen, onClose }: SearchBarProps) {
               <div className="px-3 py-3 text-sm text-neutral-500">{t("noResults")}</div>
             )}
 
-            {!loading && hasCode && (
-              <div className="py-1">
-                <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                  {t("codeSection")}
+            {!loading && hasResults && (
+              <div className="grid grid-cols-2 divide-x divide-[var(--border)]">
+                <div className="py-1">
+                  <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                    {t("codeSection")}
+                  </div>
+                  {hasCode ? results!.code.slice(0, 5).map((item, i) => {
+                    const idx = flatIndex++;
+                    return (
+                      <Link
+                        key={`code-${i}`}
+                        href={`/code/${item.filePath}#L${item.startLine}`}
+                        data-search-index={idx}
+                        className={`block px-3 py-2 text-sm hover:bg-neutral-800 ${activeIndex === idx ? "bg-neutral-800" : ""}`}
+                        onClick={handleResultClick}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-[var(--foreground)]">{item.name}</span>
+                          <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-400">{item.chunkType}</span>
+                        </div>
+                        <div className="truncate text-xs text-neutral-500">{item.filePath}</div>
+                      </Link>
+                    );
+                  }) : (
+                    <div className="px-3 py-2 text-sm text-neutral-600">—</div>
+                  )}
                 </div>
-                {results!.code.slice(0, 5).map((item, i) => {
-                  const idx = flatIndex++;
-                  return (
-                    <Link
-                      key={`code-${i}`}
-                      href={`/code/${item.filePath}#L${item.startLine}`}
-                      data-search-index={idx}
-                      className={`block px-3 py-2 text-sm hover:bg-neutral-800 ${activeIndex === idx ? "bg-neutral-800" : ""}`}
-                      onClick={handleResultClick}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-[var(--foreground)]">{item.name}</span>
-                        <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-400">{item.chunkType}</span>
-                      </div>
-                      <div className="truncate text-xs text-neutral-500">{item.filePath}</div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
 
-            {!loading && hasArticles && (
-              <div className="py-1">
-                <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                  {t("articlesSection")}
+                <div className="py-1">
+                  <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                    {t("articlesSection")}
+                  </div>
+                  {hasArticles ? results!.articles.slice(0, 5).map((item, i) => {
+                    const idx = flatIndex++;
+                    return (
+                      <Link
+                        key={`article-${i}`}
+                        href={`/articles/${item.articleSlug}`}
+                        data-search-index={idx}
+                        className={`block px-3 py-2 text-sm hover:bg-neutral-800 ${activeIndex === idx ? "bg-neutral-800" : ""}`}
+                        onClick={handleResultClick}
+                      >
+                        <div className="font-medium text-[var(--foreground)]">{item.heading}</div>
+                        <div className="truncate text-xs text-neutral-500">{item.articleSlug}</div>
+                      </Link>
+                    );
+                  }) : (
+                    <div className="px-3 py-2 text-sm text-neutral-600">—</div>
+                  )}
                 </div>
-                {results!.articles.slice(0, 5).map((item, i) => {
-                  const idx = flatIndex++;
-                  return (
-                    <Link
-                      key={`article-${i}`}
-                      href={`/articles/${item.articleSlug}`}
-                      data-search-index={idx}
-                      className={`block px-3 py-2 text-sm hover:bg-neutral-800 ${activeIndex === idx ? "bg-neutral-800" : ""}`}
-                      onClick={handleResultClick}
-                    >
-                      <div className="font-medium text-[var(--foreground)]">{item.heading}</div>
-                      <div className="truncate text-xs text-neutral-500">{item.articleSlug}</div>
-                    </Link>
-                  );
-                })}
               </div>
             )}
           </div>
