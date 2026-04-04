@@ -37,4 +37,10 @@ describe('SearchController', () => {
   it('should throw on short query', async () => {
     await expect(controller.search('a')).rejects.toThrow();
   });
+
+  it('should clamp limit to 50', async () => {
+    await controller.search('test', 'en', 100);
+    expect(mockSearchService.searchCode).toHaveBeenCalledWith('test', 50);
+    expect(mockSearchService.searchArticles).toHaveBeenCalledWith('test', 50, 'en');
+  });
 });
