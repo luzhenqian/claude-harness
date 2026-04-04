@@ -35,15 +35,15 @@ export default function ModulesClient({ modules }: ModulesClientProps) {
         </div>
       </motion.div>
 
-      <div className="treemap-container" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
+      <div className="treemap-container modules-grid">
         {modules.map((mod, index) => (
           <motion.div
             key={index}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: index * 0.02, ease: [0.16, 1, 0.3, 1] }}
-            className="tree-cell cell-xl"
-            style={{ '--cell-color': MODULE_COLORS[index % MODULE_COLORS.length], gridColumn: 'span 4', cursor: 'pointer' } as React.CSSProperties}
+            className="tree-cell modules-grid-cell"
+            style={{ '--cell-color': MODULE_COLORS[index % MODULE_COLORS.length], cursor: 'pointer' } as React.CSSProperties}
             onClick={() => router.push(`/${locale}/code?path=${encodeURIComponent(mod.path)}`)}
           >
             <div>

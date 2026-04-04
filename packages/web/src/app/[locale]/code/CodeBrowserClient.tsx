@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useTransition, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Search, ChevronDown, ChevronRight, FileText, Loader2 } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, FileText, Loader2, PanelLeftClose, PanelLeft } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { fetchSourceCode } from "./actions";
@@ -150,6 +150,7 @@ export default function CodeBrowserClient({ tree }: { tree: TreeNode[] }) {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Auto-expand to the path from URL query
   const expandedPaths = useMemo(() => {
@@ -181,6 +182,7 @@ export default function CodeBrowserClient({ tree }: { tree: TreeNode[] }) {
     setSelectedPath(path);
     setCode(null);
     setError(null);
+    setSidebarOpen(false);
     startTransition(async () => {
       const result = await fetchSourceCode(path);
       setCode(result.code);
@@ -192,15 +194,24 @@ export default function CodeBrowserClient({ tree }: { tree: TreeNode[] }) {
 
   return (
     <div
-      className="flex-1 flex overflow-hidden bg-[var(--bg-card)] m-4 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.4)] border border-[var(--border)]"
-      style={{
-        marginTop: "80px",
-        marginBottom: "40px",
-        height: "calc(100vh - 120px)",
-      }}
+      className="code-browser-container"
     >
+      {/* Mobile sidebar toggle */}
+      <button
+        className="code-sidebar-toggle"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Toggle file tree"
+      >
+        {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
+      </button>
+
+      {/* Sidebar overlay for mobile */}
+      {sidebarOpen && (
+        <div className="code-sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* Sidebar */}
-      <div className="w-72 border-r border-[var(--border)] bg-[#0d0d10] flex flex-col flex-shrink-0">
+      <div className={`code-browser-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="p-4 border-b border-[var(--border)]">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
@@ -228,9 +239,9 @@ export default function CodeBrowserClient({ tree }: { tree: TreeNode[] }) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col bg-[#0d0d10] overflow-hidden">
+      <div className="flex-1 flex flex-col bg-[#0d0d10] overflow-hidden min-w-0">
         <div className="h-14 border-b border-[var(--border)] flex items-center px-6 bg-[#111114]">
-          <span className="text-[14px] font-mono text-[var(--text-muted)]">
+          <span className="text-[14px] font-mono text-[var(--text-muted)] truncate">
             {selectedPath ? (
               <>
                 {selectedPath
@@ -253,9 +264,9 @@ export default function CodeBrowserClient({ tree }: { tree: TreeNode[] }) {
         </div>
         <div className="flex-1 overflow-auto custom-scrollbar p-6 bg-[#09090b]">
           {!selectedPath && (
-            <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)]">
+            <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)]" style={{ padding: '0 24px' }}>
               <FileText className="h-16 w-16 mb-4 opacity-30" />
-              <p className="text-[16px]">Select a file from the tree to view its source code</p>
+              <p className="text-[16px] text-center">Select a file from the tree to view its source code</p>
             </div>
           )}
 

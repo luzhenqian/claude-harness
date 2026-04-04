@@ -1,19 +1,20 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useChat } from '@/hooks/useChat';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { LoginButton } from '@/components/auth/LoginButton';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { useLocale } from '@/hooks/useLocale';
 import { t } from '@/lib/ui-translations';
 
 export function ChatPage() {
   const { user } = useAuthContext();
   const locale = useLocale();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const {
     conversations, activeConversationId, messages, isStreaming,
     loadConversations, selectConversation, createConversation,
@@ -28,10 +29,16 @@ export function ChatPage() {
     loadConversations();
   }, [user, loadConversations]);
 
+  // Close sidebar on mobile when conversation is selected
+  const handleSelectConversation = (id: string) => {
+    selectConversation(id);
+    setSidebarOpen(false);
+  };
+
   if (!user) {
     return (
       <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 56px)', paddingTop: '56px' }}>
-        <div className="text-center">
+        <div className="text-center" style={{ padding: '0 24px' }}>
           <MessageSquare size={48} style={{ color: 'var(--text-muted)', margin: '0 auto 16px' }} />
           <h2 className="text-xl font-medium mb-2" style={{ color: 'var(--text)' }}>{t(locale, 'chat.title')}</h2>
           <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>{t(locale, 'chat.signInAccess')}</p>
@@ -43,20 +50,36 @@ export function ChatPage() {
 
   return (
     <div className="flex" style={{ height: '100vh', paddingTop: '56px' }}>
-      <ChatSidebar
-        conversations={conversations}
-        activeId={activeConversationId}
-        onSelect={selectConversation}
-        onNew={() => createConversation()}
-        onRename={renameConversation}
-        onDelete={deleteConversation}
-      />
+      {/* Mobile sidebar toggle */}
+      <button
+        className="chat-sidebar-toggle"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Toggle sidebar"
+      >
+        {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
+      </button>
+
+      {/* Sidebar overlay for mobile */}
+      {sidebarOpen && (
+        <div className="chat-sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <div className={`chat-sidebar-wrapper ${sidebarOpen ? 'open' : ''}`}>
+        <ChatSidebar
+          conversations={conversations}
+          activeId={activeConversationId}
+          onSelect={handleSelectConversation}
+          onNew={() => createConversation()}
+          onRename={renameConversation}
+          onDelete={deleteConversation}
+        />
+      </div>
 
       <div className="flex-1 flex flex-col min-w-0" style={{ background: 'var(--bg)' }}>
         {activeConversationId ? (
           <>
             <div className="flex-1 flex justify-center overflow-y-auto">
-              <div className="w-full max-w-3xl">
+              <div className="w-full max-w-3xl" style={{ padding: '0 16px' }}>
                 <ChatMessages messages={messages} onEditMessage={(id, content) => editMessage(id, content)} onSend={(content) => sendMessage(content)} />
               </div>
             </div>
@@ -69,14 +92,14 @@ export function ChatPage() {
               </div>
             )}
             <div className="flex justify-center">
-              <div className="w-full max-w-3xl">
+              <div className="w-full max-w-3xl" style={{ padding: '0 16px' }}>
                 <ChatInput onSend={(content) => sendMessage(content)} disabled={isStreaming} />
               </div>
             </div>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-center max-w-md">
+            <div className="text-center max-w-md" style={{ padding: '0 24px' }}>
               {/* Terminal icon in rounded square */}
               <div style={{
                 width: 52, height: 52, borderRadius: 14, margin: '0 auto 16px',

@@ -46,7 +46,7 @@ export function ChatSidebar({ conversations, activeId, onSelect, onNew, onRename
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ width: '280px', borderRight: '1px solid #1a1a22', background: '#0a0a0d' }}>
+    <div className="flex flex-col h-full" style={{ width: '100%', borderRight: '1px solid #1a1a22', background: '#0a0a0d' }}>
       <div className="p-3">
         <button onClick={onNew}
           className="w-full flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"

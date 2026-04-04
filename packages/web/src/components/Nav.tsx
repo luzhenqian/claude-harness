@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search } from "lucide-react";
+import { Search, Menu, X } from "lucide-react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { LocaleSwitcher } from "./LocaleSwitcher";
 import { t } from "@/lib/ui-translations";
@@ -10,6 +11,22 @@ import { UserMenu } from './UserMenu';
 
 export function Nav() {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileMenuOpen]);
 
   // Hide nav on article detail pages (e.g. /zh/articles/overview)
   const segments = pathname.split('/').filter(Boolean);
@@ -26,34 +43,63 @@ export function Nav() {
   ];
 
   return (
-    <nav>
-      <Link href={`/${locale}`} className="nav-logo">
-        <div className="dot"></div>
-        Claude Harness
-      </Link>
-      <div className="nav-links">
-        {navItems.map((item) => (
-          <Link
-            key={item.path}
-            href={item.path}
-            className={cn(
-              pathname === item.path ? "active" : ""
-            )}
-          >
-            {item.name}
-          </Link>
-        ))}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div className="nav-search">
-          <Search className="h-3 w-3" />
-          <span>{t(locale, 'nav.search')}</span>
-          <kbd>⌘K</kbd>
+    <>
+      <nav>
+        <Link href={`/${locale}`} className="nav-logo">
+          <div className="dot"></div>
+          Claude Harness
+        </Link>
+        <div className="nav-links">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={cn(
+                pathname === item.path ? "active" : ""
+              )}
+            >
+              {item.name}
+            </Link>
+          ))}
         </div>
-        <LocaleSwitcher />
-        <UserMenu locale={locale} />
-      </div>
-    </nav>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="nav-search">
+            <Search className="h-3 w-3" />
+            <span>{t(locale, 'nav.search')}</span>
+            <kbd>⌘K</kbd>
+          </div>
+          <LocaleSwitcher />
+          <UserMenu locale={locale} />
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile menu overlay */}
+      {mobileMenuOpen && (
+        <div className="mobile-menu-overlay" onClick={() => setMobileMenuOpen(false)}>
+          <div className="mobile-menu" onClick={(e) => e.stopPropagation()}>
+            {navItems.map((item) => (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={cn(
+                  "mobile-menu-link",
+                  pathname === item.path ? "active" : ""
+                )}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

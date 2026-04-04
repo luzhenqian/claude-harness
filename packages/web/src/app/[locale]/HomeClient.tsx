@@ -214,7 +214,7 @@ export default function HomeClient({ locale, articles, moduleStats, sourceSummar
             const { tag, tagClass } = getArticleTag(locale, article.order);
             const orderStr = String(article.order).padStart(2, '0');
             return (
-              <motion.div key={article.slug} variants={itemVariants} className={i === 0 ? 'featured' : ''} style={i === 0 ? { gridColumn: 'span 2' } : undefined}>
+              <motion.div key={article.slug} variants={itemVariants} className={i === 0 ? 'featured' : ''}>
                 <Link
                   href={`/${locale}/articles/${article.slug}`}
                   className="article-card"
