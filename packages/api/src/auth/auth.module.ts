@@ -42,9 +42,6 @@ class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 })
 export class AuthModule {
   static register() {
-    const providers: any[] = [AuthService, JwtStrategy];
-    if (process.env.GITHUB_CLIENT_ID) providers.push(GithubStrategy);
-    if (process.env.GOOGLE_CLIENT_ID) providers.push(GoogleStrategy);
     return {
       module: AuthModule,
       imports: [
@@ -59,7 +56,7 @@ export class AuthModule {
         }),
       ],
       controllers: [AuthController],
-      providers,
+      providers: [AuthService, JwtStrategy, GithubStrategy, GoogleStrategy],
       exports: [AuthService],
     };
   }

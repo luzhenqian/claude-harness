@@ -49,7 +49,8 @@ export class AuthController {
   @ApiOkResponse({ type: User })
   @UseGuards(JwtAuthGuard)
   getMe(@Req() req: Request) {
-    return req.user;
+    const { id } = req.user as any;
+    return this.authService.findById(id);
   }
 
   @Post('logout')

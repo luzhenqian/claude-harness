@@ -33,8 +33,15 @@ export class AuthService {
         avatarUrl: profile.avatarUrl,
       });
       user = await this.userRepo.save(user);
+    } else if (profile.avatarUrl && user.avatarUrl !== profile.avatarUrl) {
+      user.avatarUrl = profile.avatarUrl;
+      user = await this.userRepo.save(user);
     }
     return user;
+  }
+
+  async findById(id: string): Promise<User | null> {
+    return this.userRepo.findOne({ where: { id } });
   }
 
   generateToken(user: User): string {
