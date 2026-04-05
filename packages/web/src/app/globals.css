@@ -1889,6 +1889,7 @@ footer a:hover { color: var(--accent); }
   width: 100vw;
   height: 100vh;
   border-radius: 0;
+  z-index: 200;
 }
 
 @media (max-width: 768px) {
