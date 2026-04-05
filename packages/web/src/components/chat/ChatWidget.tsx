@@ -20,6 +20,7 @@ export function ChatWidget({ articleSlug, articleContent }: Props) {
   const pathname = usePathname();
   const isChatPage = pathname.split('/').filter(Boolean)[1] === 'chat';
   const [isOpen, setIsOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<{ content: string; context?: any } | null>(null);
 
   const open = useCallback((message?: string, context?: any) => {
@@ -45,9 +46,11 @@ export function ChatWidget({ articleSlug, articleContent }: Props) {
         </button>
       )}
       {isOpen && (
-        <div className="chat-widget-panel">
+        <div className={`chat-widget-panel${expanded ? ' chat-widget-expanded' : ''}`}>
           <ChatPanel
-            onClose={() => { setIsOpen(false); setPendingMessage(null); }}
+            onClose={() => { setIsOpen(false); setExpanded(false); setPendingMessage(null); }}
+            expanded={expanded}
+            onToggleExpand={() => setExpanded(e => !e)}
             articleSlug={articleSlug} articleContent={articleContent}
             pendingMessage={pendingMessage}
             onPendingConsumed={() => setPendingMessage(null)}

@@ -7,19 +7,20 @@ import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { LoginButton } from '@/components/auth/LoginButton';
 import { Plus, X, Maximize2, Minimize2 } from 'lucide-react';
-import { useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { t, formatTemplate } from '@/lib/ui-translations';
 
 interface Props {
   onClose: () => void;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
   articleSlug?: string;
   articleContent?: string;
   pendingMessage?: { content: string; context?: any } | null;
   onPendingConsumed?: () => void;
 }
 
-export function ChatPanel({ onClose, articleSlug, articleContent, pendingMessage, onPendingConsumed }: Props) {
+export function ChatPanel({ onClose, expanded = false, onToggleExpand, articleSlug, articleContent, pendingMessage, onPendingConsumed }: Props) {
   const { user } = useAuthContext();
   const {
     activeConversationId, messages, isStreaming,
@@ -29,7 +30,6 @@ export function ChatPanel({ onClose, articleSlug, articleContent, pendingMessage
   const locale = useLocale();
   const initialized = useRef(false);
   const pendingHandled = useRef(false);
-  const [expanded, setExpanded] = useState(false);
 
   // Auto-find or create session on mount (skip if we have a pending new conversation)
   useEffect(() => {
@@ -147,7 +147,7 @@ export function ChatPanel({ onClose, articleSlug, articleContent, pendingMessage
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-dim)'; }}>
             <Plus size={14} />
           </button>
-          <button onClick={() => setExpanded(!expanded)}
+          <button onClick={onToggleExpand}
             style={headerBtnStyle} title={expanded ? 'Collapse' : 'Expand'}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-card-hover)'; e.currentTarget.style.color = 'var(--text)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-dim)'; }}>
