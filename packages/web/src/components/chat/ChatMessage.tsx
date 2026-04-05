@@ -129,7 +129,7 @@ export function ChatMessage({ id, role, content, isStreaming, onEdit, thinkingSt
               border: '1px solid var(--accent)',
               background: 'var(--bg)',
               color: 'var(--text)',
-              fontSize: 14,
+              fontSize: 16,
               lineHeight: 1.7,
               fontFamily: "'Noto Sans SC', sans-serif",
               resize: 'none',

@@ -48,7 +48,7 @@ export function ChatInput({ onSend, disabled }: Props) {
             border: '1px solid var(--border)',
             background: 'var(--bg)',
             color: 'var(--text)',
-            fontSize: 14,
+            fontSize: 16,
             lineHeight: 1.6,
             fontFamily: "'Noto Sans SC', sans-serif",
             resize: 'none',
