@@ -25,6 +25,10 @@ function isNativeMermaidType(chart: string): boolean {
   return /^sequenceDiagram/i.test(t);
 }
 
+function isGanttDiagram(chart: string): boolean {
+  return /^gantt/i.test(chart.trim());
+}
+
 function isStateDiagram(chart: string): boolean {
   return /^stateDiagram/i.test(chart.trim());
 }
@@ -915,6 +919,349 @@ function topoSort(
   return result;
 }
 
+// ─── Gantt Diagram ───────────────────────────────────────────────
+
+type GanttTaskStyle = "default" | "done" | "crit" | "active";
+
+interface GanttTask {
+  name: string;
+  id: string;
+  start: number;
+  end: number;
+  section: string;
+  style: GanttTaskStyle;
+}
+
+function parseGantt(chart: string): { title: string; tasks: GanttTask[]; sections: string[]; maxEnd: number } {
+  const lines = chart.split("\n").map((l) => l.trim()).filter(Boolean);
+  let title = "";
+  let currentSection = "";
+  const tasks: GanttTask[] = [];
+  const sections: string[] = [];
+  const taskMap = new Map<string, GanttTask>();
+
+  for (const line of lines) {
+    if (/^gantt/i.test(line) || /^dateFormat/i.test(line) || /^axisFormat/i.test(line)) continue;
+
+    const titleMatch = line.match(/^title\s+(.+)/i);
+    if (titleMatch) {
+      title = titleMatch[1].trim();
+      continue;
+    }
+
+    const sectionMatch = line.match(/^section\s+(.+)/i);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1].trim();
+      if (!sections.includes(currentSection)) sections.push(currentSection);
+      continue;
+    }
+
+    // Task line formats:
+    //   "Name :id, start, end"
+    //   "Name :id, after dep, end"
+    //   "Name :done, id, start, end"   (with style tag)
+    //   "Name :crit, id, start, end"   (with style tag)
+    //   "Name :active, id, start, end" (with style tag)
+    const colonIdx = line.indexOf(":");
+    if (colonIdx === -1) continue;
+
+    const name = line.slice(0, colonIdx).trim();
+    const parts = line.slice(colonIdx + 1).split(",").map((s) => s.trim());
+    if (parts.length < 3) continue;
+
+    let style: GanttTaskStyle = "default";
+    const styleTags: GanttTaskStyle[] = ["done", "crit", "active"];
+
+    // Check if first part is a style tag
+    if (styleTags.includes(parts[0] as GanttTaskStyle)) {
+      style = parts[0] as GanttTaskStyle;
+      parts.shift();
+    }
+    if (parts.length < 3) continue;
+
+    const id = parts[0];
+    const startToken = parts[1];
+    const endOrDuration = parseInt(parts[2], 10);
+
+    let start = 0;
+    let end = endOrDuration;
+    const afterMatch = startToken.match(/^after\s+(\w+)$/);
+    if (afterMatch) {
+      const dep = taskMap.get(afterMatch[1]);
+      start = dep ? dep.end : 0;
+      end = start + endOrDuration; // duration relative to dependency end
+    } else {
+      start = parseInt(startToken, 10);
+    }
+
+    const task: GanttTask = { name, id, start, end, section: currentSection, style };
+    tasks.push(task);
+    taskMap.set(id, task);
+  }
+
+  if (sections.length === 0 && tasks.length > 0) {
+    sections.push("");
+  }
+
+  const maxEnd = Math.max(...tasks.map((t) => t.end), 1);
+  return { title, tasks, sections, maxEnd };
+}
+
+function GanttDiagram({ chart }: { chart: string }) {
+  const { title, tasks, sections, maxEnd } = parseGantt(chart);
+  const ROW_H = 36;
+  const BAR_H = 22;
+  const LABEL_W = 140;
+  const TIMELINE_W = 400;
+  const PADDING_X = 24;
+  const PADDING_TOP = title ? 48 : 16;
+  const SECTION_GAP = 12;
+  const SECTION_LABEL_H = 22;
+
+  // Group tasks by section
+  const sectionTasks = new Map<string, GanttTask[]>();
+  for (const s of sections) sectionTasks.set(s, []);
+  for (const t of tasks) {
+    const list = sectionTasks.get(t.section) || [];
+    list.push(t);
+    sectionTasks.set(t.section, list);
+  }
+
+  // Pre-calculate all section/task positions
+  interface SectionLayout {
+    section: string;
+    palIdx: number;
+    startY: number;
+    labelY: number;
+    contentEndY: number;
+    tasks: Array<{ task: GanttTask; y: number }>;
+  }
+
+  const sectionLayouts: SectionLayout[] = [];
+  let y = PADDING_TOP;
+
+  sections.forEach((section, sIdx) => {
+    const sTasks = sectionTasks.get(section) || [];
+    const startY = y;
+    const hasLabel = !!section;
+    if (hasLabel) y += SECTION_LABEL_H;
+
+    const taskLayouts = sTasks.map((task, tIdx) => {
+      const taskY = y + tIdx * ROW_H;
+      return { task, y: taskY };
+    });
+
+    y += sTasks.length * ROW_H;
+    const contentEndY = y;
+    if (sIdx < sections.length - 1) y += SECTION_GAP;
+
+    sectionLayouts.push({
+      section,
+      palIdx: sIdx,
+      startY,
+      labelY: startY + 15,
+      contentEndY,
+      tasks: taskLayouts,
+    });
+  });
+
+  const totalH = y + 28;
+  const totalW = PADDING_X * 2 + LABEL_W + TIMELINE_W;
+
+  return (
+    <svg
+      viewBox={`0 0 ${totalW} ${totalH}`}
+      width="100%"
+      style={{ maxWidth: totalW, fontFamily: "'JetBrains Mono', monospace" }}
+    >
+      {/* Title */}
+      {title && (
+        <text
+          x={totalW / 2}
+          y={30}
+          textAnchor="middle"
+          fill="#94a3b8"
+          fontSize={13}
+          fontWeight={500}
+          letterSpacing={0.5}
+        >
+          {title}
+        </text>
+      )}
+
+      {/* Time axis grid lines */}
+      {Array.from({ length: maxEnd + 1 }, (_, i) => {
+        const x = PADDING_X + LABEL_W + (i / maxEnd) * TIMELINE_W;
+        return (
+          <g key={`tick-${i}`}>
+            <line
+              x1={x} y1={PADDING_TOP - 4}
+              x2={x} y2={totalH - 20}
+              stroke="rgba(148,163,184,0.06)"
+              strokeWidth={1}
+              strokeDasharray={i === 0 || i === maxEnd ? "none" : "2,4"}
+            />
+            <text
+              x={x} y={totalH - 6}
+              textAnchor="middle"
+              fill="rgba(148,163,184,0.25)"
+              fontSize={9}
+            >
+              {i}T
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Sections and tasks */}
+      {sectionLayouts.map((sl) => {
+        const pal = getPalette(sl.palIdx);
+
+        return (
+          <g key={`section-${sl.palIdx}`}>
+            {/* Section background */}
+            {sl.section && (
+              <>
+                <rect
+                  x={PADDING_X + LABEL_W - 6}
+                  y={sl.startY - 2}
+                  width={TIMELINE_W + 12}
+                  height={sl.contentEndY - sl.startY + 4}
+                  rx={8}
+                  fill={pal.border}
+                  fillOpacity={0.03}
+                  stroke={pal.border}
+                  strokeWidth={1}
+                  strokeOpacity={0.06}
+                />
+                <text
+                  x={PADDING_X + LABEL_W + 2}
+                  y={sl.labelY}
+                  fill={pal.text}
+                  fontSize={10}
+                  fontWeight={500}
+                  opacity={0.5}
+                  letterSpacing={0.3}
+                >
+                  {sl.section}
+                </text>
+              </>
+            )}
+
+            {/* Tasks */}
+            {sl.tasks.map(({ task, y: taskY }) => {
+              const barX = PADDING_X + LABEL_W + (task.start / maxEnd) * TIMELINE_W;
+              const barW = ((task.end - task.start) / maxEnd) * TIMELINE_W;
+              const cy = taskY + ROW_H / 2;
+
+              // Style-dependent colors
+              const isCrit = task.style === "crit";
+              const isDone = task.style === "done";
+              const isActive = task.style === "active";
+              const barColor = isCrit ? "#f87171" : pal.border;
+              const barBorderOpacity = isDone ? 0.15 : isCrit ? 0.5 : 0.3;
+              const barFillOpacity = isDone ? 0.06 : isCrit ? 0.2 : 0.12;
+              const labelColor = isDone ? "#64748b" : "#94a3b8";
+
+              return (
+                <g key={task.id} opacity={isDone ? 0.6 : 1}>
+                  {/* Task label */}
+                  <text
+                    x={PADDING_X + LABEL_W - 14}
+                    y={cy + 4}
+                    textAnchor="end"
+                    fill={labelColor}
+                    fontSize={11}
+                  >
+                    {task.name}
+                  </text>
+
+                  {/* Bar outer border */}
+                  <rect
+                    x={barX}
+                    y={cy - BAR_H / 2}
+                    width={barW}
+                    height={BAR_H}
+                    rx={5}
+                    fill="none"
+                    stroke={barColor}
+                    strokeWidth={1}
+                    strokeOpacity={barBorderOpacity}
+                    strokeDasharray={isActive ? "4,3" : "none"}
+                  />
+
+                  {/* Bar fill */}
+                  <rect
+                    x={barX + 0.5}
+                    y={cy - BAR_H / 2 + 0.5}
+                    width={Math.max(barW - 1, 0)}
+                    height={BAR_H - 1}
+                    rx={4.5}
+                    fill={barColor}
+                    fillOpacity={barFillOpacity}
+                  />
+
+                  {/* Bar top highlight (subtle glass effect) */}
+                  <rect
+                    x={barX + 1}
+                    y={cy - BAR_H / 2 + 1}
+                    width={Math.max(barW - 2, 0)}
+                    height={BAR_H / 2 - 1}
+                    rx={4}
+                    fill={barColor}
+                    fillOpacity={isDone ? 0.03 : 0.06}
+                  />
+
+                  {/* Crit cross-hatch overlay */}
+                  {isCrit && (
+                    <>
+                      <defs>
+                        <pattern id={`crit-${task.id}`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                          <line x1="0" y1="0" x2="0" y2="6" stroke="#f87171" strokeWidth="1" strokeOpacity="0.15" />
+                        </pattern>
+                      </defs>
+                      <rect
+                        x={barX + 1}
+                        y={cy - BAR_H / 2 + 1}
+                        width={Math.max(barW - 2, 0)}
+                        height={BAR_H - 2}
+                        rx={4}
+                        fill={`url(#crit-${task.id})`}
+                      />
+                    </>
+                  )}
+
+                  {/* Arrow tip */}
+                  {!isDone && (
+                    <polygon
+                      points={`${barX + barW},${cy - 4} ${barX + barW + 6},${cy} ${barX + barW},${cy + 4}`}
+                      fill={barColor}
+                      fillOpacity={isCrit ? 0.6 : 0.4}
+                    />
+                  )}
+
+                  {/* Done checkmark */}
+                  {isDone && (
+                    <text
+                      x={barX + barW + 6}
+                      y={cy + 4}
+                      fill="#64748b"
+                      fontSize={10}
+                      opacity={0.5}
+                    >
+                      ✓
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 // ─── Native Mermaid (sequence, state, class) ──────────────────────
 
 function NativeMermaid({ chart }: { chart: string }) {
@@ -1493,6 +1840,8 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
       <DiagramViewport>
         {isNativeMermaidType(trimmed) ? (
           <NativeMermaid chart={trimmed} />
+        ) : isGanttDiagram(trimmed) ? (
+          <GanttDiagram chart={trimmed} />
         ) : isClassDiagram(trimmed) ? (
           <ClassDiagramRenderer chart={trimmed} />
         ) : (

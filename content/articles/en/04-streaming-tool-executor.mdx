@@ -34,33 +34,49 @@ Traditional approaches fall into two extremes:
 
 **Approach A: Fully Serial**
 
-```
-Tool 1 ──────────► Tool 2 ──────────► Tool 3 ──────────► Tool 4 ──────────►
-                                                                     Total time: 4T
+```mermaid
+gantt
+    title Fully Serial Execution (Total time: 4T)
+    dateFormat X
+    axisFormat %s
+    section Execution
+        Tool 1 :a, 0, 1
+        Tool 2 :b, after a, 1
+        Tool 3 :c, after b, 1
+        Tool 4 :d, after c, 1
 ```
 
 Safe but extremely slow. Each tool waits for the previous one to finish before starting. For 3 independent file reads, this means 3x the wait time.
 
 **Approach B: Fully Parallel**
 
-```
-Tool 1 ──────────►
-Tool 2 ──────────►
-Tool 3 ──────────►
-Tool 4 ──────────►
-                   Total time: T
+```mermaid
+gantt
+    title Fully Parallel Execution (Total time: T)
+    dateFormat X
+    axisFormat %s
+    section Execution
+        Tool 1 :a, 0, 1
+        Tool 2 :b, 0, 1
+        Tool 3 :c, 0, 1
+        Tool 4 :d, 0, 1
 ```
 
 Fast but dangerous. If Tool 1 is `rm -rf build/` and Tool 2 is `cat build/output.js`, the result of parallel execution is unpredictable.
 
 **Approach C: Claude Code's Hybrid Scheduling**
 
-```
-Tool 1 (Read)   ──────────►
-Tool 2 (Read)   ──────────►
-Tool 3 (Read)   ──────────►
-                             Tool 4 (Bash) ──────────►
-                                                       Total time: 2T
+```mermaid
+gantt
+    title Hybrid Scheduling (Total time: 2T)
+    dateFormat X
+    axisFormat %s
+    section Parallel Reads
+        Tool 1 (Read)  :a, 0, 1
+        Tool 2 (Read)  :b, 0, 1
+        Tool 3 (Read)  :c, 0, 1
+    section Exclusive Write
+        Tool 4 (Bash)  :d, 1, 2
 ```
 
 Reads run in parallel, writes get exclusive access. Safe and efficient.
@@ -382,9 +398,20 @@ This code has an easily overlooked but critically important detail — the `brea
 
 Consider the following tool sequence:
 
-```
-[Read A] [Read B] [Bash "git add ."] [Read C] [Bash "git commit"]
- safe     safe      unsafe             safe      unsafe
+```mermaid
+gantt
+    title Tool Sequence with Concurrency Safety
+    dateFormat X
+    axisFormat %s
+    section safe
+        Read A :a, 0, 1
+        Read B :b, 0, 1
+    section unsafe
+        Bash "git add ." :c, 1, 2
+    section safe
+        Read C :d, 2, 3
+    section unsafe
+        Bash "git commit" :e, 3, 4
 ```
 
 Without the `break`, the scheduler would skip `Bash "git add ."` when it can't execute and continue checking `Read C`. `Read C` is concurrency-safe and might be started. But this is problematic — `Read C` would execute **before** `git add .`, potentially reading file contents not yet staged.
@@ -700,14 +727,12 @@ The `getCompletedResults()` method (lines 412-440) implements ordered emission l
 
 The traversal logic in this code is quite elegant. Let's illustrate with an example:
 
-```
-tools = [
-  Tool 1 (Read, safe)   - status: yielded
-  Tool 2 (Read, safe)   - status: completed  <- results pending emission
-  Tool 3 (Read, safe)   - status: executing
-  Tool 4 (Bash, unsafe) - status: queued
-]
-```
+| Tool | Type | Concurrency | Status | Note |
+|:---|:---|:---:|:---|:---|
+| Tool 1 | Read | safe | `yielded` | |
+| Tool 2 | Read | safe | `completed` | results pending emission |
+| Tool 3 | Read | safe | `executing` | |
+| Tool 4 | Bash | unsafe | `queued` | |
 
 Traversal process:
 1. Tool 1: `yielded`, skip (but emit any pending progress first)
@@ -717,14 +742,12 @@ Traversal process:
 
 What if Tool 3 were non-concurrency-safe?
 
-```
-tools = [
-  Tool 1 (Read, safe)    - status: yielded
-  Tool 2 (Read, safe)    - status: completed
-  Tool 3 (Bash, unsafe)  - status: executing  <- still running
-  Tool 4 (Read, safe)    - status: completed
-]
-```
+| Tool | Type | Concurrency | Status | Note |
+|:---|:---|:---:|:---|:---|
+| Tool 1 | Read | safe | `yielded` | |
+| Tool 2 | Read | safe | `completed` | |
+| Tool 3 | Bash | unsafe | `executing` | still running |
+| Tool 4 | Read | safe | `completed` | |
 
 Traversal process:
 1. Tool 1: `yielded`, skip
@@ -911,78 +934,52 @@ This guarantees that after a streaming fallback, no residual results leak into s
 
 Let's tie all the components together with an end-to-end example. Suppose the model returns the following tool calls:
 
-```
-1. Read("src/main.ts")       — concurrency-safe
-2. Grep("TODO")              — concurrency-safe
-3. Read("src/utils.ts")      — concurrency-safe
-4. Bash("npm test")          — not concurrency-safe
-5. Edit("src/main.ts", ...)  — not concurrency-safe
-```
-
-**Phase 1: Concurrent Reads**
-
-```
-t=0  addTool(Read main.ts)     -> queued -> processQueue() -> canExecute? YES -> executing
-t=1  addTool(Grep TODO)        -> queued -> processQueue() -> canExecute? YES -> executing
-t=2  addTool(Read utils.ts)    -> queued -> processQueue() -> canExecute? YES -> executing
+```mermaid
+gantt
+    title Complete Execution Flow: Scheduling 5 Tools
+    dateFormat X
+    axisFormat %s
+    section Concurrency-safe (Phase 1)
+        Read("src/main.ts") :a, 0, 2
+        Grep("TODO") :b, 0, 2
+        Read("src/utils.ts") :c, 0, 2
+    section Not concurrency-safe (Phase 4-5)
+        Bash("npm test") :d, 2, 4
+        Edit("src/main.ts") :e, 4, 5
 ```
 
-Three concurrency-safe tools begin executing simultaneously.
+**Phase 1-3: Concurrent Reads + Queuing**
 
-**Phase 2: Bash Queued**
-
-```
-t=3  addTool(Bash npm test)    -> queued -> processQueue() -> canExecute? NO (safe tools executing, but self is unsafe)
-```
-
-The Bash tool enters the queue.
-
-**Phase 3: Edit Queued**
-
-```
-t=4  addTool(Edit main.ts)     -> queued -> processQueue() -> canExecute? NO -> break (unsafe tool blocks)
-```
-
-The Edit tool also enters the queue. Encountering the queued Bash (unsafe), `break` prevents further processing.
+Three concurrency-safe tools `Read` and `Grep` pass through `addTool()` → `processQueue()` → `canExecuteTool()` and begin executing simultaneously. The subsequently arriving `Bash("npm test")` (unsafe) and `Edit("src/main.ts")` (unsafe) enter the queue — `Bash` can't acquire exclusive access while safe tools are executing, and `Edit` is blocked behind the queued `Bash` due to `break`.
 
 **Phase 4: Reads Complete, Bash Starts**
 
-```
-t=5  Read(main.ts) completed   -> processQueue() -> Bash canExecute? YES -> executing
-t=6  Grep completed
-t=7  Read(utils.ts) completed
-```
-
-When the first read completes, it triggers `processQueue()`. At this point all reads are completed or completing, and Bash is the first queued tool. Whether Bash can execute depends on whether any other tools are still executing. Assuming all reads happen to have completed by time step 5, Bash can begin exclusive execution.
+Once all reads complete, `processQueue()` triggers. The execution queue is now empty, so Bash can acquire exclusive execution access.
 
 **Phase 5: Ordered Result Emission**
 
-```
-getRemainingResults() emits:
-  -> Read(main.ts) result
-  -> Grep(TODO) result
-  -> Read(utils.ts) result
-  (waiting for Bash to complete...)
-  -> Bash(npm test) result
-  (waiting for Edit to complete...)
-  -> Edit(src/main.ts) result
-```
-
-Results are emitted strictly in the order tools were added.
+`getRemainingResults()` emits results strictly in tool addition order: Read → Grep → Read → wait for Bash → Bash result → wait for Edit → Edit result.
 
 **Exception Path: Bash Fails**
 
-If `npm test` fails:
+If `npm test` returns `is_error: true`:
 
-```
-t=8  Bash(npm test) returns is_error: true
-     -> hasErrored = true
-     -> siblingAbortController.abort('sibling_error')
-     -> Edit(src/main.ts) detects abort at executeTool() entry
-     -> Generates synthetic error: "Cancelled: parallel tool call Bash(npm test) errored"
+```mermaid
+gantt
+    title Exception Path: Cascading Cancellation After Bash Failure
+    dateFormat X
+    axisFormat %s
+    section Completed
+        Read("src/main.ts") :done, a, 0, 2
+        Grep("TODO") :done, b, 0, 2
+        Read("src/utils.ts") :done, c, 0, 2
+    section Failed
+        Bash("npm test") :crit, d, 2, 4
+    section Cancelled
+        Edit("src/main.ts") :active, e, 4, 5
 ```
 
-The Edit tool won't be executed, and the model will receive two error messages — one with Bash's real error, and one with Edit's cancellation notice. The model can then decide its next steps based on this information.
+`hasErrored = true` → `siblingAbortController.abort('sibling_error')` → Edit detects abort at `executeTool()` entry → generates synthetic error message `"Cancelled: parallel tool call Bash(npm test) errored"`. The model receives two error messages — one with Bash's real error, one with Edit's cancellation notice — and decides its next steps accordingly.
 
 ---
 
