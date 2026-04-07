@@ -918,6 +918,8 @@ sequenceDiagram
 `FileReadTool` 将 `maxResultSizeChars` 设为 `Infinity`——源码注释解释了原因：
 
 > Set to Infinity for tools whose output must never be persisted (e.g. Read, where persisting creates a circular Read→file→Read loop and the tool already self-bounds via its own limits).
+>
+> *（译：对于输出不应被持久化的工具，设为 Infinity（例如 Read，持久化会创建 Read→文件→Read 的循环读取，且该工具已通过自身的限制参数控制输出大小）。）*
 
 如果 Read 的输出被持久化到磁盘文件，AI 可能再次用 Read 读取这个文件，形成无限循环。Read 已经通过自己的 `offset`/`limit` 参数控制了输出大小，不需要外部截断。
 

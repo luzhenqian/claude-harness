@@ -160,6 +160,8 @@ export const dragon = c(0x64, 0x72, 0x61, 0x67, 0x6f, 0x6e) as 'dragon'
 为什么不直接写 `export const duck = 'duck'`？源码注释解释了原因：
 
 > One species name collides with a model-codename canary in excluded-strings.txt. The check greps build output (not source), so runtime-constructing the value keeps the literal out of the bundle while the check stays armed for the actual codename.
+>
+> *（译：某个物种名与 excluded-strings.txt 中的模型代号哨兵字符串冲突。构建检查扫描的是产物（而非源码），因此在运行时拼接字符串可以避免字面量出现在构建产物中，同时保持检查对真正的模型代号仍然有效。）*
 
 Anthropic 有一个 `excluded-strings.txt` 文件，构建流水线会扫描产物中是否包含这些受限字符串（通常是模型代号）。某个物种名恰好与某个模型代号冲突。解决方案不是只对那一个物种做编码，而是**统一编码所有物种名**，这样代码风格一致，未来新增物种时也不需要考虑冲突问题。
 
@@ -599,6 +601,8 @@ graph LR
 源码注释解释了使用本地时间而非 UTC 的设计原因：
 
 > Local date, not UTC — 24h rolling wave across timezones. Sustained Twitter buzz instead of a single UTC-midnight spike, gentler on soul-gen load.
+>
+> *（译：使用本地日期而非 UTC——跨时区形成 24 小时的滚动浪潮。持续的 Twitter 讨论热度，而非 UTC 午夜的单点爆发，对 soul 生成的服务压力也更温和。）*
 
 使用本地时间意味着东京的用户比纽约的用户早 14 小时看到这个彩蛋，产生一个跨越 24 小时的"发现浪潮"，而不是所有人同时涌入——这对后端的 soul 生成（需要调用 Claude 模型来生成名字和性格）更友好。
 

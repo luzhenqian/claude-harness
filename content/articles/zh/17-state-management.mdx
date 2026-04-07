@@ -626,6 +626,8 @@ if (false && state === selected) {
 `useAppState` 的文档强调：
 
 > Do NOT return new objects from the selector -- Object.is will always see them as changed.
+>
+> *（译：不要在 selector 中返回新对象——Object.is 会始终认为它们发生了变化。）*
 
 ```typescript
 // 好：选择已有的子对象引用

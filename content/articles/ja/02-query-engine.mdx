@@ -725,6 +725,8 @@ this.discoveredSkillNames.clear()
 `discoveredSkillNames` は現在のターンで発見されたスキル名を追跡します（`tengu_skill_tool_invocation` 分析イベントの `was_discovered` フィールドに使用）。なぜ毎ターンクリアするのでしょうか？長時間実行されるセッション（SDKモードでは数時間に及ぶ可能性がある）では、クリアしないとこのコレクションが増加し続けるからです。ソースコードのコメントがこの設計意図を明確に説明しています：
 
 > Must persist across the two processUserInputContext rebuilds inside submitMessage, but is cleared at the start of each submitMessage to avoid unbounded growth across many turns in SDK mode.
+>
+> *（訳：submitMessage 内の2回の processUserInputContext 再構築をまたいで保持する必要がありますが、SDKモードでの多ターンにわたる無制限な増加を避けるため、各 submitMessage の開始時にクリアされます。）*
 
 これは小さいながらも重要な設計決定です — **ターンスコープのクリーンアップ**。
 
@@ -765,6 +767,8 @@ if (persistSession && messagesFromUserInput.length > 0) {
 ユーザーメッセージは `query()` ループに入る**前に**永続化されます。ソースコードのコメントがその理由を説明しています：
 
 > If the process is killed before [the API responds], the transcript is left with only queue-operation entries; getLastSessionLog filters those out, returns null, and --resume fails with "No conversation found".
+>
+> *（訳：プロセスが API の応答前に終了すると、トランスクリプトにはキュー操作エントリしか残りません。getLastSessionLog はそれらを除外して null を返し、--resume は「No conversation found」で失敗します。）*
 
 ### アシスタントメッセージの非同期永続化
 

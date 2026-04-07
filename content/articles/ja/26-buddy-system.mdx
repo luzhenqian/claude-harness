@@ -160,6 +160,8 @@ export const dragon = c(0x64, 0x72, 0x61, 0x67, 0x6f, 0x6e) as 'dragon'
 なぜ単純に `export const duck = 'duck'` と書かないのでしょうか。ソースコードのコメントが理由を説明しています：
 
 > One species name collides with a model-codename canary in excluded-strings.txt. The check greps build output (not source), so runtime-constructing the value keeps the literal out of the bundle while the check stays armed for the actual codename.
+>
+> *（訳：ある種族名が excluded-strings.txt のモデルコードネームのカナリア文字列と衝突しています。チェックはビルド成果物（ソースではなく）を grep するため、実行時に値を構築することでリテラルをバンドルから除外しつつ、実際のコードネームに対するチェックは有効なままにできます。）*
 
 Anthropic には `excluded-strings.txt` ファイルがあり、ビルドパイプラインが成果物にこれらの制限された文字列（通常はモデルのコードネーム）が含まれていないかスキャンします。ある種族名が特定のモデルのコードネームと衝突していました。解決策は、その1つの種族だけをエンコードするのではなく、**すべての種族名を統一的にエンコードする**ことです。これによりコードスタイルが一貫し、将来新しい種族を追加する際にも衝突を気にする必要がなくなります。
 
@@ -599,6 +601,8 @@ graph LR
 ソースコードのコメントが、UTC ではなくローカル時間を使用する設計理由を説明しています：
 
 > Local date, not UTC — 24h rolling wave across timezones. Sustained Twitter buzz instead of a single UTC-midnight spike, gentler on soul-gen load.
+>
+> *（訳：ローカル日付を使用、UTCではなく — タイムゾーンをまたぐ24時間のローリングウェーブ。UTC深夜0時の一点集中ではなく、持続的なTwitterの話題性。soul生成の負荷にも優しい。）*
 
 ローカル時間を使用することで、東京のユーザーはニューヨークのユーザーより14時間早くこのイースターエッグを発見します。全員が同時に殺到するのではなく、24時間にわたる「発見の波」を生み出します。これは、バックエンドの soul 生成（名前と性格を生成するために Claude モデルの呼び出しが必要）への負荷も分散されます。
 

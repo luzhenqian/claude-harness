@@ -775,6 +775,8 @@ export function filterDuplicateMemoryAttachments(
 这里有一个源码注释中特别提到的微妙 bug 的修复：
 
 > The mark-after-filter ordering is load-bearing: readMemoriesForSurfacing used to write to readFileState during the prefetch, which meant the filter saw every prefetch-selected path as "already in context" and dropped them all (self-referential filter).
+>
+> *（译："先标记后过滤"的顺序至关重要：readMemoriesForSurfacing 以前在预取阶段就写入 readFileState，导致过滤器把所有预取选中的路径都视为"已在上下文中"而全部丢弃——一个自我引用的过滤器 bug。）*
 
 之前的实现在预取阶段就写入了 `readFileState`，结果过滤器检查时发现所有预取的记忆都"已在上下文中"——自己过滤掉了自己。修复方法是把写入延迟到过滤之后。
 

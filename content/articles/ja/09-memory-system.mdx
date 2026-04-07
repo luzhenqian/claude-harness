@@ -775,6 +775,8 @@ export function filterDuplicateMemoryAttachments(
 ここにはソースコードのコメントで特に言及されている微妙なバグの修正があります：
 
 > The mark-after-filter ordering is load-bearing: readMemoriesForSurfacing used to write to readFileState during the prefetch, which meant the filter saw every prefetch-selected path as "already in context" and dropped them all (self-referential filter).
+>
+> *（訳：「マーク後フィルタリング」の順序は重要です。readMemoriesForSurfacing は以前プリフェッチ中に readFileState に書き込んでいたため、フィルターがすべてのプリフェッチ選択パスを「既にコンテキストにある」と見なしてすべて除外していました（自己参照フィルター）。）*
 
 以前の実装はプリフェッチ段階で `readFileState` に書き込んでいたため、フィルターがチェックする時にすべてのプリフェッチされたメモリが「既にコンテキストにある」と判定され、自分自身を除外してしまっていました。修正方法は、書き込みをフィルタリングの後に遅延させることです。
 

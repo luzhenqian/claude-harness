@@ -948,6 +948,8 @@ this.discoveredSkillNames.clear()
 `discoveredSkillNames` 跟踪当前轮次中发现的技能名称（用于 `tengu_skill_tool_invocation` 分析事件中的 `was_discovered` 字段）。为什么要每轮清除？因为在长时间运行的会话中（SDK 模式下可能持续数小时），如果不清除，这个集合会持续增长。源码注释明确说明了这个设计意图：
 
 > Must persist across the two processUserInputContext rebuilds inside submitMessage, but is cleared at the start of each submitMessage to avoid unbounded growth across many turns in SDK mode.
+>
+> *（译：必须在 submitMessage 内部的两次 processUserInputContext 重建之间持久化，但在每次 submitMessage 开始时清除，以避免在 SDK 模式下多轮对话中无限增长。）*
 
 这是一个细小但重要的设计决策——**turn-scoped cleanup**。
 
@@ -1001,6 +1003,8 @@ if (persistSession && messagesFromUserInput.length > 0) {
 用户消息在进入 `query()` 循环**之前**就被持久化了。源码注释解释了为什么：
 
 > If the process is killed before [the API responds], the transcript is left with only queue-operation entries; getLastSessionLog filters those out, returns null, and --resume fails with "No conversation found".
+>
+> *（译：如果进程在 API 响应之前被终止，会话记录中只剩下队列操作条目；getLastSessionLog 会过滤掉这些条目、返回 null，导致 --resume 失败并提示"No conversation found"。）*
 
 ### 助手消息的异步持久化
 

@@ -626,6 +626,8 @@ if (false && state === selected) {
 `useAppState` のドキュメントは次のように強調しています：
 
 > Do NOT return new objects from the selector -- Object.is will always see them as changed.
+>
+> *（訳：セレクターから新しいオブジェクトを返さないでください。Object.is は常にそれらを変更されたと見なします。）*
 
 ```typescript
 // 良い例：既存のサブオブジェクト参照を選択

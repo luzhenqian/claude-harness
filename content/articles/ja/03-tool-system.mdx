@@ -918,6 +918,8 @@ sequenceDiagram
 `FileReadTool` は `maxResultSizeChars` を `Infinity` に設定しています。ソースコードのコメントがその理由を説明しています：
 
 > Set to Infinity for tools whose output must never be persisted (e.g. Read, where persisting creates a circular Read→file→Read loop and the tool already self-bounds via its own limits).
+>
+> *（訳：出力を永続化してはならないツールには Infinity を設定します（例：Read。永続化すると Read→ファイル→Read の循環ループが発生し、ツール自体が独自の制限で出力サイズを制御しています）。）*
 
 Readの出力がディスクファイルに永続化されると、AIがReadでそのファイルを再度読み取り、無限ループを形成する可能性があります。Readは既に独自の `offset`/`limit` パラメータで出力サイズを制御しているため、外部での切り詰めは不要です。
 
