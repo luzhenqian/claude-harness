@@ -148,18 +148,42 @@ Every tool call that enters the executor is wrapped in a `TrackedTool` object. T
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:19-32
+
+// The four possible lifecycle states of a tool within the executor.
+// Tools always progress linearly: queued -> executing -> completed -> yielded.
+// This strict ordering ensures predictable state transitions and simplifies
+// reasoning about concurrency — no tool can "go back" to a previous state.
 type ToolStatus = 'queued' | 'executing' | 'completed' | 'yielded'
 
+// TrackedTool wraps every tool call that enters the executor, adding the
+// metadata needed for lifecycle management, concurrency scheduling, and
+// ordered result emission. This is the central data structure of the system.
 type TrackedTool = {
+  // Unique identifier matching the tool_use block's ID from the API response
   id: string
+  // The raw tool_use block from the streaming API (contains tool name and input)
   block: ToolUseBlock
+  // Reference to the parent assistant message that triggered this tool call
   assistantMessage: AssistantMessage
+  // Current lifecycle state — drives scheduling and emission decisions
   status: ToolStatus
+  // Pre-computed concurrency safety flag (evaluated once at addTool time,
+  // not re-evaluated during execution, since input doesn't change)
   isConcurrencySafe: boolean
+  // The execution Promise — set when the tool starts running, used by
+  // getRemainingResults() to await completion via Promise.race
   promise?: Promise<void>
+  // Buffered final results — stored here until ordered emission by
+  // getCompletedResults(). Even if this tool finishes early, results
+  // wait until all prior tools have been emitted first.
   results?: Message[]
   // Progress messages are stored separately and yielded immediately
+  // (e.g., streaming Bash output). Unlike results, progress messages
+  // bypass the ordering constraint for real-time user feedback.
   pendingProgress: Message[]
+  // Optional functions that modify the shared execution context after
+  // this tool completes. Only supported for non-concurrent tools to
+  // avoid race conditions on shared state.
   contextModifiers?: Array<(context: ToolUseContext) => ToolUseContext>
 }
 ```
@@ -215,10 +239,19 @@ stateDiagram-v2
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:389-395
+
 // NOTE: we currently don't support context modifiers for concurrent
 //       tools. None are actively being used, but if we want to use
 //       them in concurrent tools, we need to support that here.
+
+// Only apply context modifications from non-concurrent (exclusive) tools.
+// This guard prevents race conditions: if two concurrent tools both tried
+// to modify toolUseContext simultaneously, the final state would be
+// non-deterministic. By restricting modifiers to exclusive tools, we
+// guarantee that context updates happen sequentially and predictably.
 if (!tool.isConcurrencySafe && contextModifiers.length > 0) {
+  // Apply each modifier in order — each one receives the context produced
+  // by the previous modifier, forming a reduction chain.
   for (const modifier of contextModifiers) {
     this.toolUseContext = modifier(this.toolUseContext)
   }
@@ -237,6 +270,10 @@ This method is defined at line 402 of `src/Tool.ts`:
 
 ```typescript
 // src/Tool.ts:402
+// Each tool implements this method to declare whether it can safely run
+// alongside other tools. The input parameter is key — it allows the SAME
+// tool to return different answers depending on what it's being asked to do
+// (e.g., a Bash tool running "ls" is safe, but "rm -rf" is not).
 isConcurrencySafe(input: z.infer<Input>): boolean
 ```
 
@@ -250,6 +287,7 @@ Let's look at how various tools actually declare themselves in the code:
 
 ```typescript
 // src/tools/FileReadTool/FileReadTool.ts:373-375
+// File reads are purely read-only — no side effects, no shared state mutation.
 isConcurrencySafe() {
   return true
 },
@@ -261,6 +299,7 @@ File reading is a purely read-only operation; multiple reads running simultaneou
 
 ```typescript
 // src/tools/GrepTool/GrepTool.ts:183-185
+// Search/grep is read-only, safe to run multiple searches in parallel.
 isConcurrencySafe() {
   return true
 },
@@ -272,6 +311,8 @@ Search operations are likewise read-only, naturally supporting parallelism.
 
 ```typescript
 // src/tools/AgentTool/AgentTool.tsx:1273-1275
+// Sub-agents run in fully isolated contexts (separate message history,
+// separate tool instances), so they cannot interfere with each other.
 isConcurrencySafe() {
   return true;
 },
@@ -283,6 +324,11 @@ The sub-agent tool declares itself as concurrency-safe because each sub-agent ru
 
 ```typescript
 // src/tools/BashTool/BashTool.tsx:434-436
+// The Bash tool's safety depends on the COMMAND being run. The isReadOnly
+// helper analyzes the command string to determine if it only reads data
+// (e.g., ls, cat, grep) or has side effects (e.g., rm, mv, git commit).
+// If isReadOnly is not defined or throws, the nullish coalescing (??)
+// falls back to false — the conservative "assume unsafe" default.
 isConcurrencySafe(input) {
   return this.isReadOnly?.(input) ?? false;
 },
@@ -294,8 +340,15 @@ This is the most interesting case. The Bash tool's concurrency safety depends on
 
 ```typescript
 // src/Tool.ts:757-759
+// Default values applied to all tools created via buildTool().
+// The underscore prefix on _input signals that the parameter is
+// intentionally unused — the default always returns false.
 const TOOL_DEFAULTS = {
   // ...
+  // Conservative default: any tool that doesn't explicitly opt in to
+  // concurrency safety is treated as unsafe and will run exclusively.
+  // This "fail-safe" approach means new tools are safe by default —
+  // developers must consciously declare parallelism support.
   isConcurrencySafe: (_input?: unknown) => false,
   // ...
 }
@@ -309,16 +362,34 @@ When a tool is added to the executor, the `isConcurrencySafe` calculation proces
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:104-121
+
+// LAYER 1: Validate the tool's input against its Zod schema.
+// safeParse returns { success: true, data } or { success: false, error }
+// without throwing, so invalid input is handled gracefully.
 const parsedInput = toolDefinition.inputSchema.safeParse(block.input)
+
+// Determine concurrency safety through a three-layer defensive chain:
 const isConcurrencySafe = parsedInput?.success
   ? (() => {
       try {
+        // LAYER 2: Call the tool's isConcurrencySafe with validated input.
+        // Wrapped in try-catch because a bug in the tool's implementation
+        // could throw — we never want a tool definition error to crash
+        // the entire executor.
+        // LAYER 3: Boolean() coercion prevents truthy-but-not-true values
+        // (e.g., a non-empty string) from being treated as safe.
         return Boolean(toolDefinition.isConcurrencySafe(parsedInput.data))
       } catch {
+        // Any exception in the safety check defaults to unsafe —
+        // if we can't determine safety, assume the worst.
         return false
       }
     })()
-  : false
+  : false // Invalid input => treat as unsafe (will likely error during execution anyway)
+
+// Create the TrackedTool entry and add it to the queue.
+// Every tool starts in the 'queued' state and waits for processQueue()
+// to determine when it can begin executing.
 this.tools.push({
   id: block.id,
   block,
@@ -345,10 +416,21 @@ Given each tool's concurrency safety declaration, how does the scheduler decide 
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:129-135
+
+// The core scheduling decision — implements a read-write lock pattern
+// in just 6 lines. This is called for every queued tool to determine
+// if it can start executing right now.
 private canExecuteTool(isConcurrencySafe: boolean): boolean {
+  // Snapshot of all currently running tools
   const executingTools = this.tools.filter(t => t.status === 'executing')
   return (
+    // Condition 1: No tools running — the executor is idle, so any
+    // tool (safe or unsafe) can start immediately.
     executingTools.length === 0 ||
+    // Condition 2: Both the new tool AND all running tools are
+    // concurrency-safe. This is the "multiple readers" case —
+    // safe tools can freely coexist. If ANY running tool is unsafe,
+    // this condition fails and the new tool must wait.
     (isConcurrencySafe && executingTools.every(t => t.isConcurrencySafe))
   )
 }
@@ -379,15 +461,31 @@ The `processQueue()` method (lines 140-151) is responsible for traversing the qu
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:140-151
+
+// Scans the tool queue front-to-back, starting any tools that are
+// eligible to execute. Called both when new tools are added and when
+// running tools complete — creating a self-driving scheduling loop.
 private async processQueue(): Promise<void> {
   for (const tool of this.tools) {
+    // Skip tools that are already running, finished, or emitted —
+    // only 'queued' tools need scheduling decisions.
     if (tool.status !== 'queued') continue
 
     if (this.canExecuteTool(tool.isConcurrencySafe)) {
+      // Tool can run now — start it. Note: executeTool() sets up the
+      // Promise but does NOT await completion, so multiple tools can
+      // be kicked off within a single processQueue() pass.
       await this.executeTool(tool)
     } else {
       // Can't execute this tool yet, and since we need to maintain
       // order for non-concurrent tools, stop here
+      //
+      // CRITICAL: For unsafe tools, we BREAK — not continue. This prevents
+      // tools AFTER this unsafe tool from being scheduled out of order.
+      // Without this break, a later safe tool might leapfrog this unsafe
+      // tool and execute before it, violating ordering guarantees.
+      // Safe tools just skip (implicit continue) because they don't
+      // impose ordering constraints on subsequent tools.
       if (!tool.isConcurrencySafe) break
     }
   }
@@ -429,10 +527,20 @@ Conversely: what if the tool that can't execute is a **concurrency-safe** one? I
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:398-404
+
+// Start the tool's execution and capture the resulting Promise.
+// This Promise resolves when the tool finishes (success, error, or abort).
 const promise = collectResults()
+// Store the Promise on the TrackedTool so getRemainingResults() can
+// use Promise.race() to efficiently wait for the next tool to complete.
 tool.promise = promise
 
 // Process more queue when done
+// This .finally() callback creates the self-driving scheduling loop:
+// when this tool completes, it triggers another scheduling pass, which
+// may start queued tools that were waiting for this one to finish.
+// The void keyword discards the returned Promise — we don't need to
+// await the next processQueue() call here.
 void promise.finally(() => {
   void this.processQueue()
 })
@@ -490,6 +598,13 @@ This is created by `StreamingToolExecutor` during construction as a child contro
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:59-61
+
+// Create the sibling-level AbortController as a CHILD of the query-level
+// controller. This parent-child relationship means:
+//   - If the query-level controller aborts (user presses ESC), the sibling
+//     controller is also aborted, cascading to all tools.
+//   - If the sibling controller aborts (Bash error), it does NOT propagate
+//     upward — the query continues so the model can see the error and react.
 this.siblingAbortController = createChildAbortController(
   toolUseContext.abortController,
 )
@@ -503,6 +618,11 @@ Each tool creates its own controller during execution as a child of the sibling-
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:301-302
+
+// Each tool gets its own AbortController, created as a child of the
+// sibling-level controller. This gives each tool an independent abort
+// handle while still responding to group-level and query-level aborts
+// via the parent-child chain: query -> sibling -> tool.
 const toolAbortController = createChildAbortController(
   this.siblingAbortController,
 )
@@ -514,14 +634,28 @@ When a Bash tool execution fails, the complete cascade path is as follows (lines
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:354-363
+
+// When a tool produces an error result, determine whether it should
+// cascade-cancel sibling tools or just fail in isolation.
 if (isErrorResult) {
+  // Mark this tool as errored so it won't also receive a duplicate
+  // synthetic "sibling_error" message (see deduplication logic below).
   thisToolErrored = true
   // Only Bash errors cancel siblings. Bash commands often have implicit
   // dependency chains (e.g. mkdir fails -> subsequent commands pointless).
   // Read/WebFetch/etc are independent — one failure shouldn't nuke the rest.
   if (tool.block.name === BASH_TOOL_NAME) {
+    // Set executor-wide error state so getAbortReason() returns
+    // 'sibling_error' for all other tools on their next check.
     this.hasErrored = true
+    // Record which tool caused the error, so synthetic error messages
+    // for cancelled siblings can include a helpful description like
+    // "Cancelled: parallel tool call Bash(mkdir /tmp/test) errored".
     this.erroredToolDescription = this.getToolDescription(tool)
+    // Abort the sibling controller — this cascades to ALL tool-level
+    // controllers via the parent-child chain, signaling every other
+    // running tool to stop. Does NOT propagate to the query-level
+    // controller, so the model can still process the error.
     this.siblingAbortController.abort('sibling_error')
   }
 }
@@ -542,19 +676,35 @@ The tool-level `AbortController` has a subtle event listener (lines 304-317) tha
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:304-317
+
+// Listen for this tool's abort signal to handle UPWARD propagation —
+// certain abort reasons need to bubble up from tool-level to query-level.
+// This was added to fix regression #21056 where permission denials
+// weren't properly terminating the query turn.
 toolAbortController.signal.addEventListener(
   'abort',
   () => {
+    // Only propagate upward if ALL three conditions are met:
     if (
+      // 1. The abort was NOT caused by a sibling error (those are
+      //    intentionally contained at the sibling level).
       toolAbortController.signal.reason !== 'sibling_error' &&
+      // 2. The query-level controller is not already aborted
+      //    (no need to abort something already aborted).
       !this.toolUseContext.abortController.signal.aborted &&
+      // 3. The executor is not in discard mode (streaming fallback
+      //    handles cleanup differently).
       !this.discarded
     ) {
+      // Propagate the abort reason (e.g., permission denial) up to
+      // the query-level controller, terminating the entire turn.
       this.toolUseContext.abortController.abort(
         toolAbortController.signal.reason,
       )
     }
   },
+  // { once: true } ensures this handler fires at most once and is
+  // automatically removed, preventing memory leaks.
   { once: true },
 )
 ```
@@ -567,11 +717,20 @@ Cancelled tools aren't simply discarded — they receive a synthetic error messa
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:153-205
+
+// Generates a synthetic tool_result error message for tools that were
+// cancelled before completing. The model receives these messages in its
+// conversation history so it understands WHY tools didn't produce results.
+// Each cancellation reason produces a distinct message tailored to help
+// the model make the best next decision.
 private createSyntheticErrorMessage(
   toolUseId: string,
   reason: 'sibling_error' | 'user_interrupted' | 'streaming_fallback',
   assistantMessage: AssistantMessage,
 ): Message {
+  // Case 1: User actively cancelled (pressed ESC or submitted new message).
+  // The memory correction hint tells the model not to retry the same action,
+  // since the user explicitly chose to reject it.
   if (reason === 'user_interrupted') {
     return createUserMessage({
       content: [{
@@ -584,6 +743,9 @@ private createSyntheticErrorMessage(
       // ...
     })
   }
+  // Case 2: Streaming connection failed and the executor is discarding
+  // all in-flight work. This is a transient infrastructure error, not
+  // a tool logic error — the model will typically retry.
   if (reason === 'streaming_fallback') {
     return createUserMessage({
       content: [{
@@ -595,6 +757,9 @@ private createSyntheticErrorMessage(
       // ...
     })
   }
+  // Case 3: A sibling Bash tool errored, causing this tool to be cancelled.
+  // Include the description of the ERRORED tool so the model knows which
+  // sibling caused the cascade and can reason about the dependency.
   // sibling_error
   const desc = this.erroredToolDescription
   const msg = desc
@@ -626,13 +791,27 @@ There's an elegant deduplication logic in the code — the `thisToolErrored` fla
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:328-345
+
 // Track if this specific tool has produced an error result.
 // This prevents the tool from receiving a duplicate "sibling error"
 // message when it is the one that caused the error.
+// Without this flag, a Bash tool that errors would: (1) produce its own
+// error result, (2) trigger siblingAbortController.abort(), (3) then on
+// the next loop iteration, getAbortReason() returns 'sibling_error' for
+// THIS tool too, generating a SECOND spurious error. The flag prevents step 3.
 let thisToolErrored = false
 
+// Consume the tool's execution generator, processing each update as it arrives.
+// This is the main per-tool execution loop where progress, results, and abort
+// signals are all handled in real time.
 for await (const update of generator) {
+  // On every iteration, check if this tool should be cancelled.
+  // getAbortReason() checks (in priority order): discard mode, sibling
+  // errors, and user interrupts.
   const abortReason = this.getAbortReason(tool)
+  // Only inject a synthetic error if the tool hasn't already produced its
+  // own error. This is the deduplication guard — the originating error tool
+  // already has a real error message and doesn't need a synthetic one.
   if (abortReason && !thisToolErrored) {
     messages.push(
       this.createSyntheticErrorMessage(
@@ -641,10 +820,13 @@ for await (const update of generator) {
         tool.assistantMessage,
       ),
     )
+    // Stop consuming updates — this tool is done.
     break
   }
   // ...
   if (isErrorResult) {
+    // Mark this tool as errored BEFORE the abort cascades, so the
+    // deduplication guard above will prevent a synthetic message.
     thisToolErrored = true
     // ...
   }
@@ -670,16 +852,26 @@ In the execution loop of the `executeTool()` method (lines 366-374), progress me
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:366-374
+
+// Route each message to the appropriate buffer based on its type.
+// This two-path design is fundamental to the output strategy:
+// progress is real-time, results are ordered.
 if (update.message) {
   // Progress messages go to pendingProgress for immediate yielding
+  // (e.g., streaming Bash stdout lines). Users see these in real time.
   if (update.message.type === 'progress') {
     tool.pendingProgress.push(update.message)
-    // Signal that progress is available
+    // Signal that progress is available — this resolves the Promise
+    // that getRemainingResults() is awaiting via Promise.race(),
+    // waking it up to emit the new progress immediately.
     if (this.progressAvailableResolve) {
       this.progressAvailableResolve()
+      // Clear the resolver so the next wait creates a fresh Promise.
       this.progressAvailableResolve = undefined
     }
   } else {
+    // Non-progress messages (tool_result, etc.) are final results —
+    // buffer them for ordered emission by getCompletedResults().
     messages.push(update.message)
   }
 }
@@ -693,34 +885,56 @@ The `getCompletedResults()` method (lines 412-440) implements ordered emission l
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:412-440
+
+// A synchronous generator that emits completed tool results in the order
+// tools were added (not the order they completed). This preserves a
+// deterministic output order regardless of parallel execution timing.
 *getCompletedResults(): Generator<MessageUpdate, void> {
+  // If the executor has been discarded (streaming fallback), produce nothing.
+  // Any residual results would be stale and potentially confusing.
   if (this.discarded) {
     return
   }
 
+  // Walk through tools in insertion order (the order the model requested them).
   for (const tool of this.tools) {
     // Always yield pending progress messages immediately,
-    // regardless of tool status
+    // regardless of tool status.
+    // Progress is always emitted eagerly — even for tools that haven't
+    // completed yet or have already been yielded. shift() drains the
+    // buffer one message at a time.
     while (tool.pendingProgress.length > 0) {
       const progressMessage = tool.pendingProgress.shift()!
       yield { message: progressMessage, newContext: this.toolUseContext }
     }
 
+    // Already emitted — nothing more to do for this tool.
     if (tool.status === 'yielded') {
       continue
     }
 
     if (tool.status === 'completed' && tool.results) {
+      // Transition to 'yielded' — this tool's lifecycle is now complete.
       tool.status = 'yielded'
 
+      // Emit all buffered final results for this tool.
       for (const message of tool.results) {
         yield { message, newContext: this.toolUseContext }
       }
 
+      // Notify the context that this tool is done (used for UI updates,
+      // permission tracking, etc.)
       markToolUseAsComplete(this.toolUseContext, tool.id)
     } else if (tool.status === 'executing' && !tool.isConcurrencySafe) {
+      // CRITICAL BREAK: An unsafe tool is still running. We must NOT emit
+      // any results from tools that come AFTER it, because the unsafe tool's
+      // contextModifiers may change the context that later results depend on.
+      // Wait for it to complete before continuing emission.
       break
     }
+    // If a safe tool is still executing, we simply skip past it (no break)
+    // and continue checking later tools. Safe tools don't modify context,
+    // so there's no ordering dependency.
   }
 }
 ```
@@ -763,37 +977,58 @@ Why? Because the non-concurrency-safe tool's results may have changed the contex
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:453-490
+
+// The main consumer-facing async generator. Callers use
+// `for await (const result of executor.getRemainingResults()) { ... }`
+// to receive all results and progress as they become available.
+// This method drives the entire execution loop to completion.
 async *getRemainingResults(): AsyncGenerator<MessageUpdate, void> {
+  // Early exit if executor was discarded (streaming fallback).
   if (this.discarded) {
     return
   }
 
+  // Main loop: keep running as long as any tools are queued or executing.
   while (this.hasUnfinishedTools()) {
+    // Trigger scheduling — may start new tools if queue conditions allow.
     await this.processQueue()
 
+    // Emit any results and progress that are ready right now.
     for (const result of this.getCompletedResults()) {
       yield result
     }
 
+    // If tools are still executing but there's nothing new to emit,
+    // we need to WAIT efficiently rather than busy-polling.
     if (
       this.hasExecutingTools() &&
       !this.hasCompletedResults() &&
       !this.hasPendingProgress()
     ) {
+      // Collect all executing tools' Promises — when any one resolves,
+      // it means a tool has finished and we should check for new results.
       const executingPromises = this.tools
         .filter(t => t.status === 'executing' && t.promise)
         .map(t => t.promise!)
 
+      // Create a Promise that resolves when ANY tool produces new progress.
+      // This is the "semaphore" that executeTool() resolves when it pushes
+      // a progress message into pendingProgress.
       const progressPromise = new Promise<void>(resolve => {
         this.progressAvailableResolve = resolve
       })
 
       if (executingPromises.length > 0) {
+        // Promise.race: wake up when EITHER a tool completes OR new
+        // progress arrives — whichever comes first. This is event-driven,
+        // not polling, so there's zero CPU waste while waiting.
         await Promise.race([...executingPromises, progressPromise])
       }
     }
   }
 
+  // Final drain: emit any remaining results after all tools have finished.
+  // This catches results from the last tool to complete.
   for (const result of this.getCompletedResults()) {
     yield result
   }
@@ -819,6 +1054,10 @@ The `interruptBehavior` method is defined at lines 408-416 of `src/Tool.ts`:
 
 ```typescript
 // src/Tool.ts:408-416
+
+// Declares how this tool should behave when the user interrupts execution
+// (e.g., pressing ESC or submitting a new message). This is optional —
+// tools that don't implement it inherit the safe default of 'block'.
 /**
  * What should happen when the user submits a new message while this tool
  * is running.
@@ -842,23 +1081,38 @@ The `getAbortReason()` method (lines 210-230) handles `interruptBehavior`:
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:210-230
+
+// Checks whether a tool should be aborted and returns the reason why.
+// Called on every iteration of the execution loop to detect cancellation
+// as early as possible. Returns null if the tool should keep running.
+// The priority order matters — higher-priority reasons are checked first.
 private getAbortReason(
   tool: TrackedTool,
 ): 'sibling_error' | 'user_interrupted' | 'streaming_fallback' | null {
+  // PRIORITY 1 (highest): Streaming fallback — the entire streaming
+  // connection failed, so all tools must be discarded unconditionally.
   if (this.discarded) {
     return 'streaming_fallback'
   }
+  // PRIORITY 2: A sibling Bash tool errored — cascade-cancel all tools.
   if (this.hasErrored) {
     return 'sibling_error'
   }
+  // PRIORITY 3: The query-level abort signal fired (user action).
   if (this.toolUseContext.abortController.signal.aborted) {
+    // Special case: if the reason is 'interrupt' (user submitted a new
+    // message), we check the tool's interruptBehavior. Tools that declare
+    // 'block' return null here — they continue running and the user's
+    // new message waits. Only 'cancel' tools get interrupted.
     if (this.toolUseContext.abortController.signal.reason === 'interrupt') {
       return this.getToolInterruptBehavior(tool) === 'cancel'
         ? 'user_interrupted'
-        : null
+        : null  // Tool declares 'block' — let it finish
     }
+    // For any other abort reason (e.g., ESC pressed), all tools are cancelled.
     return 'user_interrupted'
   }
+  // No abort condition detected — tool should continue executing.
   return null
 }
 ```
@@ -877,8 +1131,17 @@ The `updateInterruptibleState()` method (lines 254-260) maintains a global state
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:254-260
+
+// Updates the UI-facing flag that indicates whether the current execution
+// can be interrupted. The UI uses this to decide whether to show an
+// "interrupt" button or a "please wait" indicator.
 private updateInterruptibleState(): void {
   const executing = this.tools.filter(t => t.status === 'executing')
+  // The entire turn is interruptible ONLY if:
+  // 1. At least one tool is executing (otherwise there's nothing to interrupt)
+  // 2. ALL executing tools support cancellation ('cancel' behavior)
+  // Even one 'block' tool makes the whole turn non-interruptible — we can't
+  // partially interrupt, so we wait for the blocking tool to finish.
   this.toolUseContext.setHasInterruptibleToolInProgress?.(
     executing.length > 0 &&
       executing.every(t => this.getToolInterruptBehavior(t) === 'cancel'),
@@ -898,11 +1161,16 @@ The `discard()` method (lines 69-71) is very simple:
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:64-71
+
 /**
  * Discards all pending and in-progress tools. Called when streaming fallback
  * occurs and results from the failed attempt should be abandoned.
  * Queued tools won't start, and in-progress tools will receive synthetic errors.
  */
+// Remarkably simple: just sets a boolean flag. The actual cleanup happens
+// lazily — each tool checks this flag via getAbortReason() on its next
+// loop iteration. This avoids the complexity of forcefully terminating
+// running tools and instead lets them self-terminate gracefully.
 discard(): void {
   this.discarded = true
 }
@@ -918,6 +1186,10 @@ It only sets a flag. This flag propagates to all tools through `getAbortReason()
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts:453-456
+
+// Early exit guard: if the executor has been discarded, produce no output.
+// The async generator immediately returns (closes), so the caller's
+// for-await-of loop ends without yielding any stale results.
 async *getRemainingResults(): AsyncGenerator<MessageUpdate, void> {
   if (this.discarded) {
     return
@@ -991,13 +1263,22 @@ There's another tool orchestration implementation in `src/services/tools/toolOrc
 
 ```typescript
 // src/services/tools/toolOrchestration.ts:19-30
+
+// A simpler, non-streaming alternative to StreamingToolExecutor.
+// This function requires ALL tool calls upfront (no incremental addition)
+// and uses a batch-partition model: group tools by concurrency safety,
+// then execute each group sequentially (with safe groups running in parallel).
 export async function* runTools(
-  toolUseMessages: ToolUseBlock[],
+  toolUseMessages: ToolUseBlock[],    // All tool calls, known in advance
   assistantMessages: AssistantMessage[],
   canUseTool: CanUseToolFn,
   toolUseContext: ToolUseContext,
 ): AsyncGenerator<MessageUpdate, void> {
+  // Mutable context reference — updated by non-concurrent tools' modifiers
   let currentContext = toolUseContext
+  // partitionToolCalls groups consecutive tools: safe tools are batched
+  // together for parallel execution, unsafe tools form single-item groups.
+  // Each partition is then executed as a unit.
   for (const { isConcurrencySafe, blocks } of partitionToolCalls(
     toolUseMessages,
     currentContext,
@@ -1026,7 +1307,10 @@ It first partitions all tool calls by concurrency safety, then executes them bat
 The standard parent-child AbortController relationship is typically implemented like this:
 
 ```typescript
-// Naive implementation
+// Naive implementation — demonstrates the memory leak problem.
+// The closure captures `child`, creating a strong reference from parent to child.
+// As long as `parent` is alive, `child` can never be garbage collected,
+// even if nothing else references it.
 parent.signal.addEventListener('abort', () => {
   child.abort(parent.signal.reason)
 })
@@ -1038,24 +1322,43 @@ The problem is: `parent` holds a strong reference to `child` through the closure
 
 ```typescript
 // src/utils/abortController.ts:68-99
+
+// Creates a child AbortController that is automatically aborted when the
+// parent is aborted, but uses WeakRef to avoid memory leaks. This is the
+// foundation of the three-layer abort architecture used by StreamingToolExecutor.
 export function createChildAbortController(
   parent: AbortController,
   maxListeners?: number,
 ): AbortController {
+  // Create a fresh controller, optionally with a higher max listener count
+  // (Node.js warns at 10 listeners by default; high-concurrency tools may exceed this).
   const child = createAbortController(maxListeners)
 
+  // Edge case: if the parent is ALREADY aborted at creation time,
+  // immediately abort the child and return — no need to set up listeners.
   if (parent.signal.aborted) {
     child.abort(parent.signal.reason)
     return child
   }
 
+  // KEY INSIGHT: Use WeakRef for BOTH directions to prevent memory leaks.
+  // Without WeakRef, the parent's event listener closure would hold a strong
+  // reference to child, preventing GC even after the child is no longer needed.
   const weakChild = new WeakRef(child)
   const weakParent = new WeakRef(parent)
+  // propagateAbort is a standalone function (not a closure) that dereferences
+  // the WeakRefs at call time. If the child has been GC'd, it's a no-op.
+  // Using .bind() avoids creating a closure that captures strong references.
   const handler = propagateAbort.bind(weakParent, weakChild)
 
+  // When parent aborts, propagate to child. { once: true } auto-removes
+  // the listener after firing, preventing duplicate abort propagation.
   parent.signal.addEventListener('abort', handler, { once: true })
 
   // Auto-cleanup: remove parent listener when child is aborted
+  // If the child is aborted independently (not via parent), we clean up
+  // the listener we added to parent. This prevents listener accumulation
+  // when many short-lived children are created for a long-lived parent.
   child.signal.addEventListener(
     'abort',
     removeAbortHandler.bind(weakParent, new WeakRef(handler)),
@@ -1086,9 +1389,16 @@ These measures ensure no memory leaks occur in high-concurrency tool execution s
 Let each operation declare for itself whether it can run in parallel, rather than hard-coding rules in the scheduler:
 
 ```typescript
+// Pattern: each operation encapsulates its own concurrency knowledge.
+// The scheduler never needs to know implementation details — it just
+// asks "can you run in parallel?" and respects the answer.
 interface Operation {
-  // The operation decides for itself whether it can run in parallel
+  // The operation decides for itself whether it can run in parallel.
+  // Accepts input so the decision can be context-dependent
+  // (e.g., read-only commands vs. write commands).
   isConcurrencySafe(input: unknown): boolean
+  // AbortSignal allows the scheduler to cancel the operation externally
+  // when errors cascade or the user interrupts.
   execute(input: unknown, signal: AbortSignal): Promise<Result>
 }
 ```
@@ -1098,15 +1408,19 @@ Benefit: the scheduler doesn't need to understand the details of each operation,
 ### Pattern 2: Read-Write Lock Scheduling
 
 ```typescript
+// Implements the read-write lock pattern: safe operations are "readers"
+// that can coexist, unsafe operations are "writers" that need exclusive access.
+// This single function encapsulates the entire scheduling policy.
 function canExecute(
   newOp: Operation,
   executingOps: Operation[]
 ): boolean {
-  // No operations executing: always allowed
+  // No operations executing: always allowed (idle state)
   if (executingOps.length === 0) return true
   // New operation and all executing operations are concurrency-safe: allowed
+  // (multiple readers can coexist without conflict)
   if (newOp.isSafe && executingOps.every(op => op.isSafe)) return true
-  // Otherwise: wait
+  // Otherwise: wait (a writer is running, or we are a writer)
   return false
 }
 ```
@@ -1114,24 +1428,35 @@ function canExecute(
 ### Pattern 3: Layered AbortController
 
 ```typescript
+// Demonstrates the three-layer AbortController pattern:
+// parent (query-level) -> group (sibling-level) -> operation (tool-level).
+// Aborting a layer cancels all its descendants but NOT its ancestors.
 class OperationGroup {
   private groupController: AbortController
   private operations: Map<string, AbortController> = new Map()
 
   constructor(parentController: AbortController) {
     // group controller is a child of the parent controller
+    // If the parent aborts (e.g., user cancels everything), this group
+    // and all its operations are automatically aborted via the parent-child chain.
     this.groupController = createChild(parentController)
   }
 
   addOperation(id: string): AbortSignal {
     // each operation's controller is a child of the group
+    // This gives each operation an independent abort handle while still
+    // responding to group-level cancellation.
     const opController = createChild(this.groupController)
     this.operations.set(id, opController)
+    // Return the signal (not the controller) — operations can listen
+    // for abort but cannot abort themselves (principle of least privilege).
     return opController.signal
   }
 
   cancelGroup(reason: string): void {
     // cancel all operations in the group without affecting the parent
+    // This is the key property: error cascading is SCOPED to this group.
+    // The parent (and other groups) continue unaffected.
     this.groupController.abort(reason)
   }
 }
@@ -1140,26 +1465,39 @@ class OperationGroup {
 ### Pattern 4: Separating Progress from Results
 
 ```typescript
+// The dual-channel output pattern: progress is real-time (out of order),
+// results are sequential (in insertion order). This gives users immediate
+// feedback while maintaining deterministic final output.
 interface TrackedOperation {
   status: 'queued' | 'executing' | 'completed' | 'yielded'
   // Progress messages stored separately, can be emitted out of order
+  // (e.g., streaming stdout from a long-running command)
   pendingProgress: ProgressEvent[]
-  // Final results emitted in order
+  // Final results emitted in order — buffered until all prior
+  // operations have been yielded
   results?: Result[]
 }
 
+// Generator that walks operations in order, emitting what's ready
+// and stopping at ordering barriers.
 function* yieldInOrder(operations: TrackedOperation[]) {
   for (const op of operations) {
-    // Progress is always emitted immediately
+    // Progress is always emitted immediately — splice(0) drains and
+    // clears the array in one atomic operation
     yield* op.pendingProgress.splice(0)
 
     if (op.status === 'completed') {
+      // This operation is done — emit its results and mark as yielded
       yield* op.results!
       op.status = 'yielded'
     } else if (op.status === 'executing' && !op.isSafe) {
-      // Non-safe operations block subsequent result emission
+      // Non-safe operations block subsequent result emission.
+      // We can't emit later results because this unsafe operation
+      // might modify shared context that later results depend on.
       break
     }
+    // Safe operations that are still executing are simply skipped —
+    // they don't block emission of later completed operations.
   }
 }
 ```
@@ -1167,9 +1505,12 @@ function* yieldInOrder(operations: TrackedOperation[]) {
 ### Pattern 5: Conservative Defaults
 
 ```typescript
+// Conservative defaults: in safety-critical systems, the safest behavior
+// should require zero configuration. Developers must explicitly OPT IN
+// to more permissive behavior (parallelism, interruptibility).
 const DEFAULTS = {
-  isConcurrencySafe: () => false,    // Default to unsafe
-  interruptBehavior: () => 'block',  // Default to non-interruptible
+  isConcurrencySafe: () => false,    // Default to unsafe — runs exclusively
+  interruptBehavior: () => 'block',  // Default to non-interruptible — finishes before new input
 }
 ```
 
@@ -1180,33 +1521,49 @@ In safety-related scenarios, always make the default behavior the most conservat
 Combining the patterns above, a minimal viable concurrency scheduler is roughly 200 lines of code:
 
 ```typescript
+// A minimal but complete implementation combining all patterns above.
+// This ~60-line scheduler demonstrates the core concepts of
+// StreamingToolExecutor without the streaming, progress, or interrupt
+// complexity. Suitable as a starting point for your own projects.
+
+// Four-state lifecycle — same as StreamingToolExecutor's TrackedTool
 type OperationStatus = 'queued' | 'executing' | 'completed' | 'yielded'
 
 interface TrackedOp<T> {
   id: string
-  isSafe: boolean
-  status: OperationStatus
-  execute: (signal: AbortSignal) => Promise<T>
-  result?: T
-  error?: Error
-  promise?: Promise<void>
+  isSafe: boolean                              // Concurrency safety declaration
+  status: OperationStatus                      // Current lifecycle state
+  execute: (signal: AbortSignal) => Promise<T> // The actual work to perform
+  result?: T                                   // Buffered result (set on completion)
+  error?: Error                                // Captured error (set on failure)
+  promise?: Promise<void>                      // Execution handle for awaiting
 }
 
+// Generic scheduler parameterized by result type T.
+// Implements the read-write lock pattern with ordered result emission.
 class ConcurrentScheduler<T> {
   private ops: TrackedOp<T>[] = []
+  // Group-level AbortController — aborting this cancels all operations,
+  // analogous to StreamingToolExecutor's siblingAbortController.
   private groupAbort = new AbortController()
 
+  // Add an operation and immediately attempt to schedule it.
+  // Operations can be added incrementally (one at a time) — the scheduler
+  // handles ordering and concurrency automatically.
   add(op: TrackedOp<T>): void {
     this.ops.push({ ...op, status: 'queued' })
     this.processQueue()
   }
 
+  // Read-write lock check: safe ops can coexist, unsafe ops need exclusivity.
   private canExecute(isSafe: boolean): boolean {
     const executing = this.ops.filter(o => o.status === 'executing')
     return executing.length === 0 ||
       (isSafe && executing.every(o => o.isSafe))
   }
 
+  // Scan the queue and start eligible operations. The break on unsafe ops
+  // preserves ordering — no operation after an unsafe one can leapfrog it.
   private processQueue(): void {
     for (const op of this.ops) {
       if (op.status !== 'queued') continue
@@ -1218,20 +1575,27 @@ class ConcurrentScheduler<T> {
     }
   }
 
+  // Execute a single operation with error cascading for unsafe operations.
   private async executeOp(op: TrackedOp<T>): Promise<void> {
     op.status = 'executing'
     try {
+      // Pass the group abort signal so operations can check for cancellation
       op.result = await op.execute(this.groupAbort.signal)
     } catch (e) {
       op.error = e as Error
+      // Only unsafe operation errors cascade — safe operations fail in isolation
       if (!op.isSafe) {
         this.groupAbort.abort('operation_error')
       }
     }
     op.status = 'completed'
+    // Self-driving loop: completion triggers another scheduling pass,
+    // which may unblock queued operations waiting for this one.
     this.processQueue()
   }
 
+  // Emit results in insertion order, with the same barrier logic as
+  // StreamingToolExecutor's getCompletedResults().
   *getResults(): Generator<{ id: string; result?: T; error?: Error }> {
     for (const op of this.ops) {
       if (op.status === 'yielded') continue
@@ -1239,6 +1603,8 @@ class ConcurrentScheduler<T> {
         op.status = 'yielded'
         yield { id: op.id, result: op.result, error: op.error }
       } else if (op.status === 'executing' && !op.isSafe) {
+        // Unsafe operation still running — stop emission to preserve
+        // ordering. Results after this point may depend on its outcome.
         break
       }
     }
