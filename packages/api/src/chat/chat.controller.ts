@@ -1,6 +1,7 @@
 import {
   Controller, Get, Post, Patch, Delete,
   Param, Body, Req, Res, UseGuards, HttpException, HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags, ApiBearerAuth, ApiOperation, ApiOkResponse, ApiNotFoundResponse,
@@ -20,6 +21,8 @@ import { Message } from './entities/message.entity';
 @Controller('conversations')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
+  private readonly logger = new Logger(ChatController.name);
+
   constructor(
     private readonly chatService: ChatService,
     private readonly mastraService: MastraService,
@@ -189,8 +192,18 @@ export class ChatController {
       });
 
       if (messages.length <= 1 && !conv.title) {
-        const title = body.content.slice(0, 50) + (body.content.length > 50 ? '...' : '');
-        await this.chatService.updateConversation(id, user.id, { title });
+        // 设置临时标题
+        const tempTitle = body.content.slice(0, 50) + (body.content.length > 50 ? '...' : '');
+        await this.chatService.updateConversation(id, user.id, { title: tempTitle });
+
+        // 异步生成 AI 标题，不阻塞响应
+        this.chatService.generateTitle(body.content, fullResponse).then(async (aiTitle) => {
+          if (aiTitle) {
+            await this.chatService.updateConversation(id, user.id, { title: aiTitle });
+          }
+        }).catch((err) => {
+          this.logger.warn(`Failed to generate AI title for conversation ${id}: ${err.message}`);
+        });
       }
 
       res.write(`data: [DONE]\n\n`);
