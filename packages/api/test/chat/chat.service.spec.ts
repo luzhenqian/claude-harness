@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ChatService } from '../../src/chat/chat.service';
+import { LlmService } from '../../src/llm/llm.service';
 import { Repository } from 'typeorm';
 import { Conversation } from '../../src/chat/entities/conversation.entity';
 import { Message } from '../../src/chat/entities/message.entity';
@@ -8,6 +9,7 @@ describe('ChatService', () => {
   let service: ChatService;
   let convRepo: Repository<Conversation>;
   let msgRepo: Repository<Message>;
+  let llmService: LlmService;
 
   beforeEach(() => {
     convRepo = {
@@ -22,7 +24,10 @@ describe('ChatService', () => {
       save: vi.fn().mockImplementation((m) => Promise.resolve({ ...m, id: 'msg-1' })),
       find: vi.fn().mockResolvedValue([]),
     } as any;
-    service = new ChatService(convRepo, msgRepo);
+    llmService = {
+      getTitleProvider: vi.fn(),
+    } as any;
+    service = new ChatService(convRepo, msgRepo, llmService);
   });
 
   it('should create a conversation', async () => {
