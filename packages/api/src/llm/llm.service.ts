@@ -11,8 +11,10 @@ import { OpenAIProvider } from './providers/openai.provider';
 export class LlmService implements OnModuleInit {
   private chatProviders = new Map<string, LLMProvider>();
   private embeddingProviders = new Map<string, LLMProvider>();
+  private titleProviders = new Map<string, LLMProvider>();
   private defaultChatId: string | null = null;
   private defaultEmbeddingId: string | null = null;
+  private defaultTitleId: string | null = null;
 
   constructor(
     @InjectRepository(LlmProviderEntity)
@@ -25,6 +27,7 @@ export class LlmService implements OnModuleInit {
     const records = await this.repo.find({ where: { enabled: true } });
     this.chatProviders.clear();
     this.embeddingProviders.clear();
+    this.titleProviders.clear();
     for (const record of records) {
       const provider = this.createProvider(record);
       if (!provider) continue;
@@ -34,6 +37,9 @@ export class LlmService implements OnModuleInit {
       } else if (record.type === 'embedding') {
         this.embeddingProviders.set(record.id, provider);
         if (record.isDefault) this.defaultEmbeddingId = record.id;
+      } else if (record.type === 'title') {
+        this.titleProviders.set(record.id, provider);
+        if (record.isDefault) this.defaultTitleId = record.id;
       }
     }
   }
@@ -80,5 +86,18 @@ export class LlmService implements OnModuleInit {
       : this.embeddingProviders.values().next().value;
     if (!provider) throw new Error('No embedding provider available');
     return provider;
+  }
+
+  async getTitleProvider(): Promise<LLMProvider> {
+    if (!this.titleProviders.size && !this.chatProviders.size) await this.loadProviders();
+    // 优先使用专用 title provider
+    if (this.titleProviders.size) {
+      const provider = this.defaultTitleId
+        ? this.titleProviders.get(this.defaultTitleId)
+        : this.titleProviders.values().next().value;
+      if (provider) return provider;
+    }
+    // 降级到 chat provider
+    return this.getChatProvider();
   }
 }
