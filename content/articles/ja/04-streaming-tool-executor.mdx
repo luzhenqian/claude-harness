@@ -1257,6 +1257,8 @@ class ConcurrentScheduler<T> {
 コードコメントが明確に述べています（357-359行目）：
 
 > Bash commands often have implicit dependency chains (e.g. mkdir fails -> subsequent commands pointless). Read/WebFetch/etc are independent — one failure shouldn't nuke the rest.
+>
+> *（訳：Bashコマンドには暗黙の依存チェーンがあることが多い（例：mkdirの失敗 → 後続コマンドが無意味に）。Read/WebFetchなどは独立しており、1つの失敗が残りを巻き込むべきではない。）*
 
 これは実用主義的な選択です。理論的には各ツールに「自分のエラーがカスケードすべきか」を宣言させることもできますが、実際にはBashツールのみがこのような暗黙の依存関係を持ちます。過剰設計はツール開発者の認知負荷を増やすだけです。
 
@@ -1265,6 +1267,8 @@ class ConcurrentScheduler<T> {
 コード内のコメント（389-390行目）がこれを機能ギャップとして認めています：
 
 > NOTE: we currently don't support context modifiers for concurrent tools. None are actively being used, but if we want to use them in concurrent tools, we need to support that here.
+>
+> *（訳：注意：現在、並行ツールのコンテキスト修飾子はサポートしていません。現在使用中のものはありませんが、並行ツールで使用したい場合は、ここでサポートを追加する必要があります。）*
 
 並行ツールが共有コンテキストを変更するにはレースコンディション問題の解決が必要です。2つのツールが同じコンテキストフィールドを同時に変更したらどうなるでしょうか？現在のアプローチは単純に禁止し、実際の需要が発生した時に解決策を設計することです。これは「YAGNI」（You Aren't Gonna Need It）の典型的な適用です。
 

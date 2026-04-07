@@ -1257,6 +1257,8 @@ class ConcurrentScheduler<T> {
 代码注释说得很清楚（第 357-359 行）：
 
 > Bash commands often have implicit dependency chains (e.g. mkdir fails -> subsequent commands pointless). Read/WebFetch/etc are independent — one failure shouldn't nuke the rest.
+>
+> *（译：Bash 命令之间往往存在隐式依赖链（例如 mkdir 失败 → 后续命令毫无意义）。Read/WebFetch 等工具则是独立的——一个失败不应该连带摧毁其余的。）*
 
 这是一个实用主义的选择。理论上可以让每个工具声明"我的错误是否应该级联"，但在实践中，只有 Bash 工具有这种隐式依赖关系。过度设计反而增加了工具开发者的认知负担。
 
@@ -1265,6 +1267,8 @@ class ConcurrentScheduler<T> {
 代码中的注释（第 389-390 行）承认这是一个功能缺口：
 
 > NOTE: we currently don't support context modifiers for concurrent tools. None are actively being used, but if we want to use them in concurrent tools, we need to support that here.
+>
+> *（译：注意：我们目前不支持并发工具的上下文修改器。目前没有在使用中的，但如果将来要在并发工具中使用，需要在这里添加支持。）*
 
 并发工具修改共享上下文需要解决竞态条件问题——两个工具同时修改同一个上下文字段怎么办？目前的做法是直接禁止，等到有实际需求时再设计解决方案。这是一个"YAGNI"（You Aren't Gonna Need It）的典型应用。
 
