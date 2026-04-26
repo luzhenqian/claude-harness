@@ -133,11 +133,11 @@ export function estimateMessageTokens(messages: Message[]): number {
 
 ```mermaid
 flowchart TD
-    A["tokenCountWithEstimation(messages)"] --> B{"最后一个 assistant\n有 usage 数据？"}
-    B -->|是| C["获取 API usage\n精确 token 数"]
-    B -->|否| D["对全部消息做\n粗略估算"]
-    C --> E["对 usage 之后的\n新消息做粗略估算"]
-    E --> F["精确数 + 粗略增量\n= 当前 token 总量"]
+    A["tokenCountWithEstimation(messages)"] --> B{"最后一个 assistant<br/>有 usage 数据？"}
+    B -->|是| C["获取 API usage<br/>精确 token 数"]
+    B -->|否| D["对全部消息做<br/>粗略估算"]
+    C --> E["对 usage 之后的<br/>新消息做粗略估算"]
+    E --> F["精确数 + 粗略增量<br/>= 当前 token 总量"]
     D --> F
 
     style A fill:#1e3a5f,color:#e0e0e0
@@ -218,10 +218,10 @@ export const MANUAL_COMPACT_BUFFER_TOKENS = 3_000     // 阻塞限制：仅留 3
 flowchart LR
     subgraph 上下文窗口使用量
         A["0K"] --> B["...正常区域..."]
-        B --> C["~147K\n⚠️ 警告阈值"]
-        C --> D["~167K\n🔄 自动压缩"]
-        D --> E["~177K\n🚫 阻塞限制"]
-        E --> F["~180K\n有效窗口"]
+        B --> C["~147K<br/>⚠️ 警告阈值"]
+        C --> D["~167K<br/>🔄 自动压缩"]
+        D --> E["~177K<br/>🚫 阻塞限制"]
+        E --> F["~180K<br/>有效窗口"]
     end
 
     style A fill:#1a3d1e,color:#e0e0e0
@@ -311,17 +311,17 @@ export async function shouldAutoCompact(
 
 ```mermaid
 flowchart TD
-    A["autoCompactIfNeeded\n每次 query loop 调用"] --> B{"DISABLE_COMPACT\n环境变量？"}
+    A["autoCompactIfNeeded<br/>每次 query loop 调用"] --> B{"DISABLE_COMPACT<br/>环境变量？"}
     B -->|是| Z["返回 wasCompacted: false"]
-    B -->|否| C{"连续失败次数\n>= 3？"}
+    B -->|否| C{"连续失败次数<br/>>= 3？"}
     C -->|是| Z
-    C -->|否| D{"shouldAutoCompact\ntoken > 阈值？"}
+    C -->|否| D{"shouldAutoCompact<br/>token > 阈值？"}
     D -->|否| Z
-    D -->|是| E["尝试 Session Memory\nCompaction"]
-    E -->|成功| F["返回 wasCompacted: true\n重置失败计数"]
-    E -->|失败/null| G["执行完整\ncompactConversation"]
+    D -->|是| E["尝试 Session Memory<br/>Compaction"]
+    E -->|成功| F["返回 wasCompacted: true<br/>重置失败计数"]
+    E -->|失败/null| G["执行完整<br/>compactConversation"]
     G -->|成功| F
-    G -->|异常| H["递增失败计数\n返回 wasCompacted: false"]
+    G -->|异常| H["递增失败计数<br/>返回 wasCompacted: false"]
 
     style A fill:#1e3a5f,color:#e0e0e0
     style B fill:#3d2e1a,color:#e0e0e0
@@ -804,22 +804,22 @@ ${formattedSummary}`
 
 ```mermaid
 flowchart TD
-    A["每次 API 请求前"] --> B["microcompactMessages\n第一层：轻量清理"]
-    B --> C{"时间间隔 >\n阈值？"}
-    C -->|是| D["Time-based MC\n清除旧工具结果内容"]
-    C -->|否| E{"Cached MC\n可用？"}
-    E -->|是| F["Cached MC\n通过 cache_edits 删除"]
+    A["每次 API 请求前"] --> B["microcompactMessages<br/>第一层：轻量清理"]
+    B --> C{"时间间隔 ><br/>阈值？"}
+    C -->|是| D["Time-based MC<br/>清除旧工具结果内容"]
+    C -->|否| E{"Cached MC<br/>可用？"}
+    E -->|是| F["Cached MC<br/>通过 cache_edits 删除"]
     E -->|否| G["跳过 microcompact"]
 
-    H["每次 query loop 迭代"] --> I["shouldAutoCompact\ntoken 超阈值？"]
+    H["每次 query loop 迭代"] --> I["shouldAutoCompact<br/>token 超阈值？"]
     I -->|否| J["继续正常对话"]
-    I -->|是| K["trySessionMemoryCompaction\n第二层：零 API 压缩"]
-    K -->|成功| L["用 Session Memory\n替代旧消息"]
-    K -->|失败| M["compactConversation\n第三层：LLM 完整摘要"]
-    M -->|成功| N["用 LLM 摘要\n替代旧消息"]
-    M -->|失败| O["记录失败\n下次重试或熔断"]
+    I -->|是| K["trySessionMemoryCompaction<br/>第二层：零 API 压缩"]
+    K -->|成功| L["用 Session Memory<br/>替代旧消息"]
+    K -->|失败| M["compactConversation<br/>第三层：LLM 完整摘要"]
+    M -->|成功| N["用 LLM 摘要<br/>替代旧消息"]
+    M -->|失败| O["记录失败<br/>下次重试或熔断"]
 
-    P["用户输入 /compact"] --> Q["compactConversation\n手动触发完整压缩"]
+    P["用户输入 /compact"] --> Q["compactConversation<br/>手动触发完整压缩"]
 
     style A fill:#1e3a5f,color:#e0e0e0
     style B fill:#1e3a5f,color:#e0e0e0

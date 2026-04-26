@@ -114,11 +114,11 @@ This design cleverly avoids two extremes: pure API counting is too slow (require
 
 ```mermaid
 flowchart TD
-    A["tokenCountWithEstimation(messages)"] --> B{"Does the last assistant\nmessage have usage data?"}
-    B -->|Yes| C["Get API usage:\nprecise token count"]
-    B -->|No| D["Run rough estimation\non all messages"]
-    C --> E["Run rough estimation\non new messages after usage"]
-    E --> F["Precise count + rough increment\n= current token total"]
+    A["tokenCountWithEstimation(messages)"] --> B{"Does the last assistant<br/>message have usage data?"}
+    B -->|Yes| C["Get API usage:<br/>precise token count"]
+    B -->|No| D["Run rough estimation<br/>on all messages"]
+    C --> E["Run rough estimation<br/>on new messages after usage"]
+    E --> F["Precise count + rough increment<br/>= current token total"]
     D --> F
 
     style A fill:#1e3a5f,color:#e0e0e0
@@ -191,10 +191,10 @@ Here's a concrete example (assuming an effective window of 180K tokens):
 flowchart LR
     subgraph ContextWindowUsage["Context Window Usage"]
         A["0K"] --> B["...Normal zone..."]
-        B --> C["~147K\nWarning threshold"]
-        C --> D["~167K\nAuto-compact"]
-        D --> E["~177K\nBlocking limit"]
-        E --> F["~180K\nEffective window"]
+        B --> C["~147K<br/>Warning threshold"]
+        C --> D["~167K<br/>Auto-compact"]
+        D --> E["~177K<br/>Blocking limit"]
+        E --> F["~180K<br/>Effective window"]
     end
 
     style A fill:#1a3d1e,color:#e0e0e0
@@ -278,17 +278,17 @@ The first short-circuit condition deserves special attention: `querySource === '
 
 ```mermaid
 flowchart TD
-    A["autoCompactIfNeeded\nCalled each query loop"] --> B{"DISABLE_COMPACT\nenv variable?"}
+    A["autoCompactIfNeeded<br/>Called each query loop"] --> B{"DISABLE_COMPACT<br/>env variable?"}
     B -->|Yes| Z["Return wasCompacted: false"]
-    B -->|No| C{"Consecutive failures\n>= 3?"}
+    B -->|No| C{"Consecutive failures<br/>>= 3?"}
     C -->|Yes| Z
-    C -->|No| D{"shouldAutoCompact\ntokens > threshold?"}
+    C -->|No| D{"shouldAutoCompact<br/>tokens > threshold?"}
     D -->|No| Z
-    D -->|Yes| E["Try Session Memory\nCompaction"]
-    E -->|Success| F["Return wasCompacted: true\nReset failure count"]
-    E -->|Failure/null| G["Execute full\ncompactConversation"]
+    D -->|Yes| E["Try Session Memory<br/>Compaction"]
+    E -->|Success| F["Return wasCompacted: true<br/>Reset failure count"]
+    E -->|Failure/null| G["Execute full<br/>compactConversation"]
     G -->|Success| F
-    G -->|Error| H["Increment failure count\nReturn wasCompacted: false"]
+    G -->|Error| H["Increment failure count<br/>Return wasCompacted: false"]
 
     style A fill:#1e3a5f,color:#e0e0e0
     style B fill:#3d2e1a,color:#e0e0e0
@@ -703,22 +703,22 @@ Let's summarize the entire compression system's hierarchy with a complete diagra
 
 ```mermaid
 flowchart TD
-    A["Before each API request"] --> B["microcompactMessages\nLayer 1: Lightweight cleanup"]
-    B --> C{"Time gap >\nthreshold?"}
-    C -->|Yes| D["Time-based MC\nClear old tool result content"]
-    C -->|No| E{"Cached MC\navailable?"}
-    E -->|Yes| F["Cached MC\nDelete via cache_edits"]
+    A["Before each API request"] --> B["microcompactMessages<br/>Layer 1: Lightweight cleanup"]
+    B --> C{"Time gap ><br/>threshold?"}
+    C -->|Yes| D["Time-based MC<br/>Clear old tool result content"]
+    C -->|No| E{"Cached MC<br/>available?"}
+    E -->|Yes| F["Cached MC<br/>Delete via cache_edits"]
     E -->|No| G["Skip microcompact"]
 
-    H["Each query loop iteration"] --> I["shouldAutoCompact\nTokens > threshold?"]
+    H["Each query loop iteration"] --> I["shouldAutoCompact<br/>Tokens > threshold?"]
     I -->|No| J["Continue normal conversation"]
-    I -->|Yes| K["trySessionMemoryCompaction\nLayer 2: Zero API-call compression"]
-    K -->|Success| L["Replace old messages\nwith Session Memory"]
-    K -->|Failure| M["compactConversation\nLayer 3: Full LLM summary"]
-    M -->|Success| N["Replace old messages\nwith LLM summary"]
-    M -->|Failure| O["Record failure\nRetry next time or trip breaker"]
+    I -->|Yes| K["trySessionMemoryCompaction<br/>Layer 2: Zero API-call compression"]
+    K -->|Success| L["Replace old messages<br/>with Session Memory"]
+    K -->|Failure| M["compactConversation<br/>Layer 3: Full LLM summary"]
+    M -->|Success| N["Replace old messages<br/>with LLM summary"]
+    M -->|Failure| O["Record failure<br/>Retry next time or trip breaker"]
 
-    P["User types /compact"] --> Q["compactConversation\nManual full compaction"]
+    P["User types /compact"] --> Q["compactConversation<br/>Manual full compaction"]
 
     style A fill:#1e3a5f,color:#e0e0e0
     style B fill:#1e3a5f,color:#e0e0e0

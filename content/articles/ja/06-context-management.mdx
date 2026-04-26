@@ -114,11 +114,11 @@ export function estimateMessageTokens(messages: Message[]): number {
 
 ```mermaid
 flowchart TD
-    A["tokenCountWithEstimation(messages)"] --> B{"最後の assistant に\nusage データあり？"}
-    B -->|はい| C["API usage から\n精確なトークン数を取得"]
-    B -->|いいえ| D["全メッセージに対して\n粗い推定を実行"]
-    C --> E["usage 以降の\n新メッセージを粗く推定"]
-    E --> F["精確数 + 粗い増分\n= 現在のトークン合計"]
+    A["tokenCountWithEstimation(messages)"] --> B{"最後の assistant に<br/>usage データあり？"}
+    B -->|はい| C["API usage から<br/>精確なトークン数を取得"]
+    B -->|いいえ| D["全メッセージに対して<br/>粗い推定を実行"]
+    C --> E["usage 以降の<br/>新メッセージを粗く推定"]
+    E --> F["精確数 + 粗い増分<br/>= 現在のトークン合計"]
     D --> F
 
     style A fill:#1e3a5f,color:#e0e0e0
@@ -191,10 +191,10 @@ export const MANUAL_COMPACT_BUFFER_TOKENS = 3_000
 flowchart LR
     subgraph コンテキストウィンドウ使用量
         A["0K"] --> B["...通常領域..."]
-        B --> C["~147K\n⚠️ 警告閾値"]
-        C --> D["~167K\n🔄 自動圧縮"]
-        D --> E["~177K\n🚫 ブロッキング制限"]
-        E --> F["~180K\n有効ウィンドウ"]
+        B --> C["~147K<br/>⚠️ 警告閾値"]
+        C --> D["~167K<br/>🔄 自動圧縮"]
+        D --> E["~177K<br/>🚫 ブロッキング制限"]
+        E --> F["~180K<br/>有効ウィンドウ"]
     end
 
     style A fill:#1a3d1e,color:#e0e0e0
@@ -278,17 +278,17 @@ export async function shouldAutoCompact(
 
 ```mermaid
 flowchart TD
-    A["autoCompactIfNeeded\n各 query loop で呼び出し"] --> B{"DISABLE_COMPACT\n環境変数？"}
+    A["autoCompactIfNeeded<br/>各 query loop で呼び出し"] --> B{"DISABLE_COMPACT<br/>環境変数？"}
     B -->|はい| Z["wasCompacted: false を返す"]
-    B -->|いいえ| C{"連続失敗回数\n>= 3？"}
+    B -->|いいえ| C{"連続失敗回数<br/>>= 3？"}
     C -->|はい| Z
-    C -->|いいえ| D{"shouldAutoCompact\ntoken > 閾値？"}
+    C -->|いいえ| D{"shouldAutoCompact<br/>token > 閾値？"}
     D -->|いいえ| Z
-    D -->|はい| E["Session Memory\nCompaction を試行"]
-    E -->|成功| F["wasCompacted: true を返す\n失敗カウントをリセット"]
-    E -->|失敗/null| G["完全な\ncompactConversation を実行"]
+    D -->|はい| E["Session Memory<br/>Compaction を試行"]
+    E -->|成功| F["wasCompacted: true を返す<br/>失敗カウントをリセット"]
+    E -->|失敗/null| G["完全な<br/>compactConversation を実行"]
     G -->|成功| F
-    G -->|例外| H["失敗カウントを増加\nwasCompacted: false を返す"]
+    G -->|例外| H["失敗カウントを増加<br/>wasCompacted: false を返す"]
 
     style A fill:#1e3a5f,color:#e0e0e0
     style B fill:#3d2e1a,color:#e0e0e0
@@ -703,22 +703,22 @@ ${formattedSummary}`
 
 ```mermaid
 flowchart TD
-    A["各 API リクエスト前"] --> B["microcompactMessages\n第 1 層：軽量クリーニング"]
-    B --> C{"時間間隔 >\n閾値？"}
-    C -->|はい| D["Time-based MC\n古いツール結果内容をクリア"]
-    C -->|いいえ| E{"Cached MC\n利用可能？"}
-    E -->|はい| F["Cached MC\ncache_edits で削除"]
+    A["各 API リクエスト前"] --> B["microcompactMessages<br/>第 1 層：軽量クリーニング"]
+    B --> C{"時間間隔 ><br/>閾値？"}
+    C -->|はい| D["Time-based MC<br/>古いツール結果内容をクリア"]
+    C -->|いいえ| E{"Cached MC<br/>利用可能？"}
+    E -->|はい| F["Cached MC<br/>cache_edits で削除"]
     E -->|いいえ| G["microcompact をスキップ"]
 
-    H["各 query loop イテレーション"] --> I["shouldAutoCompact\ntoken が閾値超え？"]
+    H["各 query loop イテレーション"] --> I["shouldAutoCompact<br/>token が閾値超え？"]
     I -->|いいえ| J["通常の会話を続行"]
-    I -->|はい| K["trySessionMemoryCompaction\n第 2 層：API 呼び出しゼロの圧縮"]
-    K -->|成功| L["Session Memory で\n古いメッセージを置換"]
-    K -->|失敗| M["compactConversation\n第 3 層：LLM 完全サマリー"]
-    M -->|成功| N["LLM サマリーで\n古いメッセージを置換"]
-    M -->|失敗| O["失敗を記録\n次回リトライまたはサーキットブレーク"]
+    I -->|はい| K["trySessionMemoryCompaction<br/>第 2 層：API 呼び出しゼロの圧縮"]
+    K -->|成功| L["Session Memory で<br/>古いメッセージを置換"]
+    K -->|失敗| M["compactConversation<br/>第 3 層：LLM 完全サマリー"]
+    M -->|成功| N["LLM サマリーで<br/>古いメッセージを置換"]
+    M -->|失敗| O["失敗を記録<br/>次回リトライまたはサーキットブレーク"]
 
-    P["ユーザーが /compact を入力"] --> Q["compactConversation\n手動トリガーによる完全圧縮"]
+    P["ユーザーが /compact を入力"] --> Q["compactConversation<br/>手動トリガーによる完全圧縮"]
 
     style A fill:#1e3a5f,color:#e0e0e0
     style B fill:#1e3a5f,color:#e0e0e0
